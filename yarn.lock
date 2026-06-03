@@ -3916,6 +3916,7 @@ __metadata:
     react-tv-space-navigation: "npm:*"
     ts-jest: "npm:^28.0.0"
     typescript: "npm:4.8.4"
+    xmldom: "npm:0.6.0"
   languageName: unknown
   linkType: soft
 
@@ -20497,6 +20498,13 @@ __metadata:
   dependencies:
     sax: "npm:^1.2.4"
   checksum: 10c0/7957c57ff77008ced62063560d3e8f80c7fdf31d3fafa12d16c9f1fe676c8255f50889e8f41b61cca4cd473b841eedf2625089dcaf3f6b8717df521b9d0acfcf
+  languageName: node
+  linkType: hard
+
+"xmldom@npm:0.6.0":
+  version: 0.6.0
+  resolution: "xmldom@npm:0.6.0"
+  checksum: 10c0/93cbb4854f73f431a402e7942baa87a59e8445fd0b4ae6bf6af3a1007809e849da8ac70bbe1509242212bce5d19e30b55ea282cbd9d87281701d1bdc13b74623
   languageName: node
   linkType: hard
 
