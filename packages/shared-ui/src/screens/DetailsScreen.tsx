@@ -3,11 +3,12 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StyleSheet, View, Image, Text } from 'react-native';
 import { SpatialNavigationRoot, DefaultFocus } from 'react-tv-space-navigation';
 import { scaledPixels } from '../hooks/useScale';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState, useRef } from 'react';
 import { useIsFocused } from '@react-navigation/native';
 import FocusablePressable from '../components/FocusablePressable';
 import { RootStackParamList } from '../navigation/types';
 import { safeZones, colors } from '../theme';
+import JellyfinClient from '../services/JellyfinClient';
 
 type DetailsScreenRouteProp = RouteProp<RootStackParamList, 'Details'>;
 type DetailsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Details'>;
@@ -26,10 +27,14 @@ export default function DetailsScreen() {
     rating,
     ratingCount,
     contentRating,
-    duration
+    duration,
+    accessToken,
+    userId,
   } = route.params;
 
   const isFocused = useIsFocused();
+  const [isResolvingPlaybackUrl, setIsResolvingPlaybackUrl] = useState(false);
+  const resolvingRef = useRef(false);
 
   // Memoize image source to prevent unnecessary re-renders
   const imageSource = useMemo(() => ({ uri: headerImage }), [headerImage]);
@@ -54,12 +59,33 @@ export default function DetailsScreen() {
     return `${rating.toFixed(1)} ⭐ (${ratingCount || 0} ratings)`;
   }, [rating, ratingCount]);
 
-  const navigate = useCallback(() => {
-    navigation.navigate('Player', {
-      movie: movie,
-      headerImage: headerImage,
-    });
-  }, [navigation, movie, headerImage]);
+  const navigate = useCallback(async () => {
+    if (resolvingRef.current) return;
+    resolvingRef.current = true;
+    setIsResolvingPlaybackUrl(true);
+
+    try {
+      if (accessToken && userId) {
+        const { url, format } = await JellyfinClient.getPlaybackUrl(accessToken, userId, movie);
+        navigation.navigate('Player', {
+          movie: url,
+          headerImage: headerImage,
+          format,
+          itemId: movie,
+        });
+      } else {
+        navigation.navigate('Player', {
+          movie: movie,
+          headerImage: headerImage,
+        });
+      }
+    } catch (e) {
+      console.error('[DetailsScreen] Failed to resolve playback URL', e);
+    } finally {
+      setIsResolvingPlaybackUrl(false);
+      resolvingRef.current = false;
+    }
+  }, [navigation, movie, headerImage, accessToken, userId]);
 
   return (
     <SpatialNavigationRoot isActive={isFocused}>
@@ -115,7 +141,7 @@ export default function DetailsScreen() {
             </View>
             <DefaultFocus>
               <FocusablePressable
-                text={'Watch now'}
+                text={isResolvingPlaybackUrl ? 'Loading...' : 'Watch now'}
                 onSelect={navigate}
                 style={buttonStyle}
               />

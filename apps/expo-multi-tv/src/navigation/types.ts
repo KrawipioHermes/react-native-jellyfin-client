@@ -20,6 +20,8 @@ export type ExpoRootStackParamList = {
     ratingCount?: number;
     contentRating?: string;
     duration?: number;
+    accessToken?: string;
+    userId?: string;
   };
-  Player: { movie: string; headerImage: string };
+  Player: { movie: string; headerImage: string; format?: string; itemId?: string };
 };
