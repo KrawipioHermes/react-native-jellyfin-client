@@ -1,11 +1,10 @@
-import React, { useEffect, useRef } from "react";
-import { View, StyleSheet, Animated } from "react-native";
-import { DefaultFocus } from "react-tv-space-navigation";
-import FocusablePressable from "../FocusablePressable";
-import SeekBar from "./SeekBar";
-import LoadingIndicator from "../LoadingIndicator";
-import { scaledPixels } from "../../hooks/useScale";
-import { safeZones } from "../../theme";
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, Animated } from 'react-native';
+import TopBar from './TopBar';
+import CenterControls from './CenterControls';
+import BottomBar from './BottomBar';
+import LoadingIndicator from '../LoadingIndicator';
+import type { ChapterMarker } from '../../types/player';
 
 interface VideoOverlayProps {
   visible: boolean;
@@ -15,8 +14,20 @@ interface VideoOverlayProps {
   currentTime: number;
   duration: number;
   isBuffering?: boolean;
+  title?: string;
+  chapters?: ChapterMarker[];
+  seekPreviewTime?: number;
+  seekPreviewDirection?: 'forward' | 'backward';
 }
 
+/**
+ * TV-friendly overlay with:
+ * - TopBar: Exit button + title + time remaining
+ * - CenterControls: Large play/pause button
+ * - BottomBar: Seek bar + time display + seek preview
+ * - Loading indicator during buffering
+ * - Smooth fade animations
+ */
 const VideoOverlay: React.FC<VideoOverlayProps> = React.memo(({
   visible,
   paused,
@@ -25,77 +36,59 @@ const VideoOverlay: React.FC<VideoOverlayProps> = React.memo(({
   currentTime,
   duration,
   isBuffering = false,
+  title,
+  chapters,
+  seekPreviewTime,
+  seekPreviewDirection,
 }) => {
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (visible) {
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
+    Animated.timing(opacity, {
+      toValue: visible ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
   }, [visible, opacity]);
 
   if (!visible) {
     return null;
   }
 
-  const styles = overlayStyles;
-
   return (
     <Animated.View style={[styles.container, { opacity }]}>
       {isBuffering && <LoadingIndicator />}
 
-      <FocusablePressable
-        text="Exit"
-        onSelect={onExit}
-        style={styles.exitButton}
+      <TopBar
+        title={title}
+        currentTime={currentTime}
+        duration={duration}
+        onExit={onExit}
       />
 
-      <View style={styles.bottomControls}>
-        <DefaultFocus>
-          <FocusablePressable
-            text={paused ? "Play" : "Pause"}
-            onSelect={onPlayPause}
-            style={styles.controlButton}
-          />
-        </DefaultFocus>
-        <SeekBar currentTime={currentTime} duration={duration} />
-      </View>
+      <CenterControls
+        paused={paused}
+        onPlayPause={onPlayPause}
+      />
+
+      <BottomBar
+        currentTime={currentTime}
+        duration={duration}
+        chapters={chapters}
+        seekPreviewTime={seekPreviewTime}
+        seekPreviewDirection={seekPreviewDirection}
+      />
     </Animated.View>
   );
 });
 
-const overlayStyles = StyleSheet.create({
+VideoOverlay.displayName = 'VideoOverlay';
+
+const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "space-between",
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 10,
-  },
-  exitButton: {
-    position: "absolute",
-    top: scaledPixels(safeZones.actionSafe.vertical),
-    start: scaledPixels(safeZones.actionSafe.horizontal),
-  },
-  bottomControls: {
-    position: "absolute",
-    bottom: scaledPixels(safeZones.actionSafe.vertical),
-    start: scaledPixels(safeZones.actionSafe.horizontal),
-    end: scaledPixels(safeZones.actionSafe.horizontal),
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  controlButton: {
-    marginEnd: scaledPixels(20),
   },
 });
 
