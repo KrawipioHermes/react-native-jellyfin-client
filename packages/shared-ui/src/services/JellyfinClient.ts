@@ -63,11 +63,7 @@ const getLibraries = async (token: string, userId: string): Promise<BaseItemDto[
 
 const FIRE_TV_DEVICE_PROFILE = {
   MaxStreamingBitrate: 40000000,
-  DirectPlayProfiles: [
-    { Container: 'mp4', Type: 'Video', VideoCodec: 'h264', AudioCodec: 'aac,mp3' },
-    { Container: 'mkv', Type: 'Video', VideoCodec: 'h264', AudioCodec: 'aac,mp3' },
-    { Container: 'webm', Type: 'Video', VideoCodec: 'h264', AudioCodec: 'aac,mp3' },
-  ],
+  DirectPlayProfiles: [],
   TranscodingProfiles: [
     {
       Container: 'ts',

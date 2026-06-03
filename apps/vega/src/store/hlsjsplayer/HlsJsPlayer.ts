@@ -30,6 +30,9 @@ export class HlsJsPlayer extends PlayerBase {
   private playbackItem: {} = {};
   player: Hls;
   static readonly enableNativeParsing = false;
+  private mediaErrorRecoveryAttempted = false;
+  private fatalErrorListeners: Array<(data: any) => void> = [];
+
   constructor(mediaElement: HTMLMediaElement) {
     super(mediaElement);
   }
@@ -147,8 +150,17 @@ export class HlsJsPlayer extends PlayerBase {
       progressive: false,
       debug: true,
       backBufferLength: 30,
-      maxBufferLength: 10,
-      maxMaxBufferLength: 30,
+      maxBufferLength: 30,
+      maxMaxBufferLength: 60,
+      // W3C Media reports buffered ranges with small gaps; raise the threshold
+      // so HLS.js doesn't treat them as real holes and enter a nudge loop.
+      maxBufferHole: 0.5,
+      manifestLoadingMaxRetry: 6,
+      levelLoadingMaxRetry: 6,
+      fragLoadingMaxRetry: 10,
+      manifestLoadingTimeOut: 20000,
+      levelLoadingTimeOut: 20000,
+      fragLoadingTimeOut: 30000,
 
       drmSystems: {
         [this.playbackItem.drm_scheme]: {
@@ -165,6 +177,22 @@ export class HlsJsPlayer extends PlayerBase {
       }
     });
     console.log('W3cMediaApp::hlsjsplayer:Create instance in Hls player');
+
+    this.player.on(HlsPlayerLib.Events.ERROR, (event, data) => {
+      if (!data.fatal) return;
+      if (data.type === HlsPlayerLib.ErrorTypes.NETWORK_ERROR) {
+        this.player.startLoad();
+      } else if (data.type === HlsPlayerLib.ErrorTypes.MEDIA_ERROR) {
+        if (!this.mediaErrorRecoveryAttempted) {
+          this.mediaErrorRecoveryAttempted = true;
+          this.player.recoverMediaError();
+        } else {
+          this.fatalErrorListeners.forEach(cb => cb({ playerType: 'HLS', errorCode: data.type, errorMessage: data.details }));
+        }
+      } else {
+        this.fatalErrorListeners.forEach(cb => cb({ playerType: 'HLS', errorCode: data.type, errorMessage: data.details }));
+      }
+    });
   };
 
   nativeParseLevelPlaylist( manifest: string,
@@ -212,6 +240,7 @@ export class HlsJsPlayer extends PlayerBase {
     }
 
     this.playbackItem = content;
+    this.mediaErrorRecoveryAttempted = false;
 
     if (!this.player) {
       this.createPlayerInstance();
@@ -241,6 +270,7 @@ export class HlsJsPlayer extends PlayerBase {
 
   override async destroy(): Promise<void> {
     console.log('W3cMediaApp::hlsjsplayer: Destroy');
+    this.fatalErrorListeners = [];
     await this.unload();
     await this.player?.destroy();
     this.player = null;
@@ -342,15 +372,7 @@ export class HlsJsPlayer extends PlayerBase {
            this.registerTimedMetadataEvent(listener);
            break;
       case "error":
-           this.player.on(HlsEventsMap.get(type), (event, data) => {
-             if (data?.fatal) {
-               listener({
-                 playerType: 'HLS',
-                 errorCode: data.type,
-                 errorMessage: data.details
-               });
-             }
-           });
+           this.fatalErrorListeners.push(listener);
            break;
       case "debug":
            this.registerPlaybackEvents(listener);
@@ -372,6 +394,9 @@ export class HlsJsPlayer extends PlayerBase {
     }
 
     switch (type) {
+      case "error":
+           this.fatalErrorListeners = this.fatalErrorListeners.filter(cb => cb !== listener);
+           break;
       case "debug":
            this.player.off(HlsPlayerLib.Events.MANIFEST_LOADED, listener);
            this.player.off(HlsPlayerLib.Events.MANIFEST_PARSED, listener);

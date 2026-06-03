@@ -4,7 +4,8 @@ import { RootStackParamList } from './types';
 import VegaDrawerNavigator from './VegaDrawerNavigator';
 import JellyfinLoginScreen from '../screens/JellyfinLoginScreen';
 import JellyfinStorage from '../services/jellyfin/JellyfinStorage';
-import { DetailsScreen, PlayerScreen } from '@multi-tv/shared-ui';
+import { DetailsScreen } from '@multi-tv/shared-ui';
+import VegaPlayerScreen from '../screens/VegaPlayerScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -31,7 +32,7 @@ export default function VegaRootNavigator() {
       <Stack.Screen name="JellyfinLogin" component={JellyfinLoginScreen} />
       <Stack.Screen name="Main" component={VegaDrawerNavigator} />
       <Stack.Screen name="Details" component={DetailsScreen} />
-      <Stack.Screen name="Player" component={PlayerScreen} />
+      <Stack.Screen name="Player" component={VegaPlayerScreen} />
     </Stack.Navigator>
   );
 }
