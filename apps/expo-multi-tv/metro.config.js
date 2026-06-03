@@ -21,11 +21,22 @@ config.resolver = {
   extraNodeModules: {
     '@multi-tv/shared-ui': path.resolve(__dirname, '../../packages/shared-ui/src'),
   },
-  // Make Metro pick the browser-compatible axios build on web.
-  // Axios exports: browser/react-native → dist/browser/axios.cjs, default → dist/node/axios.cjs
-  // Without this, Metro on web falls through to 'default' and loads the Node.js http adapter,
-  // which doesn't exist in a browser context and throws before any request is made.
-  unstable_conditionNames: ['browser', 'require', 'react-native'],
+  resolveRequest: (context, moduleName, platform) => {
+    // When @jellyfin/sdk uses `import ... from 'axios'` (ESM), Metro sets
+    // isESMImport=true and adds 'import' (not 'require') to the conditions set.
+    // The axios 'browser' export condition then falls through to its ESM
+    // entry (./index.js) rather than the pre-built CJS browser bundle
+    // (./dist/browser/axios.cjs). The ESM entry pulls in Node.js-only modules
+    // (http, crypto, etc.) that don't exist in a browser context.
+    // Explicitly redirecting to the CJS browser bundle on web avoids this.
+    if (platform === 'web' && moduleName === 'axios') {
+      return {
+        filePath: require.resolve('axios/dist/browser/axios.cjs'),
+        type: 'sourceFile',
+      };
+    }
+    return context.resolveRequest(context, moduleName, platform);
+  },
 };
 
 // When enabled, the optional code below will allow Metro to resolve

@@ -80,7 +80,8 @@ const JellyfinLoginScreen = ({ navigation }: Props) => {
       secretRef.current = result.Secret;
       setCode(result.Code);
       startPolling(result.Secret);
-    } catch {
+    } catch (e: any) {
+      console.error('[Jellyfin] initQuickConnect failed:', e?.message, e?.code, e?.response?.status, e?.config?.url);
       setError(
         'Could not reach Jellyfin server. Make sure the server is running.',
       );
