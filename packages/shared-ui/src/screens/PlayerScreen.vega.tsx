@@ -11,11 +11,18 @@ import {
 import { VideoPlayer as W3CVideoPlayer } from '@amazon-devices/react-native-w3cmedia';
 import RemoteControlManager from '../app/remote-control/RemoteControlManager';
 import { SupportedKeys } from '../app/remote-control/SupportedKeys';
-import VideoOverlay from '../components/player/VideoOverlay.vega';
-import ExitButton from '../components/player/ExitButton';
+import VideoOverlay from '../components/player/VideoOverlay';
+import FocusablePressable from '../components/FocusablePressable';
 import VideoPlayer from '../components/player/VideoPlayer.vega';
 import { RootStackParamList } from '../navigation/types';
 import { VideoHandler } from '../utils/VideoHandler.kepler';
+import type { ChapterMarker } from '../types/player';
+import JellyfinClient from '../services/JellyfinClient';
+import { useSelector } from 'react-redux';
+import { useAutoHideControls } from '../hooks/useAutoHideControls';
+import { useSeekManager } from '../hooks/useSeekManager';
+import { scaledPixels } from '../hooks/useScale';
+import { safeZones } from '../theme';
 
 type PlayerScreenRouteProp = RouteProp<RootStackParamList, 'Player'>;
 type PlayerScreenNavigationProp = NativeStackNavigationProp<
@@ -24,22 +31,12 @@ type PlayerScreenNavigationProp = NativeStackNavigationProp<
 >;
 
 /**
- * PlayerScreen for Vega/Kepler Platform
- *
- * This Kepler-specific player screen uses W3C Media APIs and Amazon's
- * native video rendering stack for optimal Fire TV performance.
- *
- * Key differences from standard PlayerScreen:
- * - Uses VideoHandler class for video lifecycle management
- * - Uses W3C Media VideoPlayer instead of react-native-video
- * - Integrates with Kepler Media Controls (KMC)
- * - Uses KeplerVideoSurfaceView for hardware-accelerated rendering
- * - Handles Fire TV remote control events
+ * PlayerScreen for Vega/Kepler Platform — Enhanced with accelerated seeking + chapter markers
  */
 export default function PlayerScreen() {
   const route = useRoute<PlayerScreenRouteProp>();
   const navigation = useNavigation<PlayerScreenNavigationProp>();
-  const { movie, headerImage } = route.params;
+  const { movie, headerImage, itemId, title } = route.params;
   const isFocused = useIsFocused();
 
   // Kepler-specific hooks
@@ -47,24 +44,28 @@ export default function PlayerScreen() {
     useKeplerAppStateManager();
   const componentInstance = keplerAppStateManager.getComponentInstance();
 
+  // Get auth from Redux store
+  const { accessToken, userId } = useSelector((state: any) => state.jellyfin);
+
   // Video state
   const [paused, setPaused] = useState<boolean>(false);
-  const [controlsVisible, setControlsVisible] = useState<boolean>(false);
   const [isVideoBuffering, setIsVideoBuffering] = useState<boolean>(true);
   const [isVideoInitialized, setIsVideoInitialized] = useState<boolean>(false);
   const [isVideoEnded, setIsVideoEnded] = useState<boolean>(false);
   const [isVideoError, setIsVideoError] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
+  const [chapters, setChapters] = useState<ChapterMarker[]>([]);
 
   // Refs
   const videoRef = useRef<W3CVideoPlayer | null>(null);
   const surfaceHandleRef = useRef<string | null>(null);
   const captionViewHandleRef = useRef<string | null>(null);
-  const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentTimeRef = useRef<number>(0);
   const durationRef = useRef<number>(0);
   const videoHandlerRef = useRef<VideoHandler | null>(null);
+
+  const [controlsVisible, showControls] = useAutoHideControls();
 
   // Update refs when state changes
   useEffect(() => {
@@ -75,19 +76,16 @@ export default function PlayerScreen() {
     durationRef.current = duration;
   }, [duration]);
 
-  /**
-   * Show controls with auto-hide
-   */
-  const showControls = useCallback(() => {
-    setControlsVisible(true);
-
-    if (hideControlsTimeoutRef.current) {
-      clearTimeout(hideControlsTimeoutRef.current);
+  // Fetch chapters on mount
+  useEffect(() => {
+    if (itemId && accessToken && userId) {
+      JellyfinClient.getChapters(accessToken, userId, itemId)
+        .then((ch) => setChapters(ch ?? []))
+        .catch(() => {
+          // Chapters are non-critical; fail silently
+        });
     }
-    hideControlsTimeoutRef.current = setTimeout(() => {
-      setControlsVisible(false);
-    }, 5000);
-  }, []);
+  }, [itemId, accessToken, userId]);
 
   /**
    * Seek to a specific time
@@ -105,6 +103,9 @@ export default function PlayerScreen() {
       }
     }
   }, [showControls]);
+
+  const { seekPreviewTime, seekPreviewDirection, startAcceleratedSeek, stopAcceleratedSeek } =
+    useSeekManager(currentTime, duration, seek);
 
   /**
    * Toggle play/pause
@@ -132,7 +133,6 @@ export default function PlayerScreen() {
   const navigateBack = useCallback(() => {
     console.log('[PlayerScreen.kepler] - Navigating back');
 
-    // Clear surface and caption handles
     if (surfaceHandleRef.current && videoRef.current) {
       videoRef.current.clearSurfaceHandle(surfaceHandleRef.current);
     }
@@ -140,11 +140,9 @@ export default function PlayerScreen() {
       videoRef.current.clearCaptionViewHandle(captionViewHandleRef.current);
     }
 
-    // Destroy video elements
     videoHandlerRef.current?.destroyVideoElements();
     videoRef.current = null;
 
-    // Navigate back after short delay
     setTimeout(() => {
       navigation.goBack();
     }, 300);
@@ -156,9 +154,6 @@ export default function PlayerScreen() {
   useEffect(() => {
     if (!isFocused) return;
 
-    console.log('[PlayerScreen.kepler] - Initializing video handler');
-
-    // Create video handler
     videoHandlerRef.current = new VideoHandler(
       videoRef,
       movie,
@@ -171,12 +166,9 @@ export default function PlayerScreen() {
       setIsVideoBuffering,
     );
 
-    // Start pre-buffering video
     videoHandlerRef.current.preBufferVideo(componentInstance);
 
     return () => {
-      // Cleanup on unmount
-      console.log('[PlayerScreen.kepler] - Cleaning up video handler');
       if (surfaceHandleRef.current && videoRef.current) {
         videoRef.current.clearSurfaceHandle(surfaceHandleRef.current);
       }
@@ -189,9 +181,6 @@ export default function PlayerScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [movie, headerImage, isFocused]);
 
-  /**
-   * Handle video end - pause, show controls, and navigate back
-   */
   useEffect(() => {
     if (isVideoEnded) {
       setPaused(true);
@@ -200,9 +189,6 @@ export default function PlayerScreen() {
     }
   }, [isVideoEnded, navigateBack]);
 
-  /**
-   * Show controls when video starts
-   */
   useEffect(() => {
     if (isVideoInitialized && duration > 0) {
       showControls();
@@ -218,13 +204,14 @@ export default function PlayerScreen() {
         switch (key) {
           case SupportedKeys.Right:
           case SupportedKeys.FastForward:
-            seek(currentTimeRef.current + 10);
+            startAcceleratedSeek(1);
             break;
           case SupportedKeys.Left:
           case SupportedKeys.Rewind:
-            seek(currentTimeRef.current - 10);
+            startAcceleratedSeek(-1);
             break;
           case SupportedKeys.Back:
+            stopAcceleratedSeek();
             navigateBack();
             break;
           case SupportedKeys.PlayPause:
@@ -241,7 +228,6 @@ export default function PlayerScreen() {
 
     const listener = RemoteControlManager.addKeydownListener(handleKeyDown);
 
-    // Setup hardware back button listener
     const backHandler = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
@@ -253,44 +239,28 @@ export default function PlayerScreen() {
     return () => {
       RemoteControlManager.removeKeydownListener(listener);
       backHandler.remove();
+      stopAcceleratedSeek();
     };
-  }, [seek, togglePausePlay, showControls, navigateBack]);
+  }, [seek, togglePausePlay, showControls, navigateBack, startAcceleratedSeek, stopAcceleratedSeek]);
 
-  /**
-   * Handle surface view creation
-   */
   const onSurfaceViewCreated = useCallback((surfaceHandle: string) => {
-    console.log('[PlayerScreen.kepler] - Surface view created:', surfaceHandle);
     surfaceHandleRef.current = surfaceHandle;
 
-    // Set surface handle on video player
     if (videoRef.current) {
       videoRef.current.setSurfaceHandle(surfaceHandle);
-      // Start playback once surface is set
       videoRef.current.play();
       setPaused(false);
     }
   }, []);
 
-  /**
-   * Handle surface view destruction
-   */
   const onSurfaceViewDestroyed = useCallback((surfaceHandle: string) => {
-    console.log(
-      '[PlayerScreen.kepler] - Surface view destroyed:',
-      surfaceHandle,
-    );
     if (videoRef.current) {
       videoRef.current.clearSurfaceHandle(surfaceHandle);
     }
     surfaceHandleRef.current = null;
   }, []);
 
-  /**
-   * Handle caption view creation
-   */
   const onCaptionViewCreated = useCallback((captionHandle: string) => {
-    console.log('[PlayerScreen.kepler] - Caption view created:', captionHandle);
     captionViewHandleRef.current = captionHandle;
 
     if (videoRef.current) {
@@ -298,14 +268,7 @@ export default function PlayerScreen() {
     }
   }, []);
 
-  /**
-   * Handle caption view destruction
-   */
   const onCaptionViewDestroyed = useCallback((captionHandle: string) => {
-    console.log(
-      '[PlayerScreen.kepler] - Caption view destroyed:',
-      captionHandle,
-    );
     if (videoRef.current) {
       videoRef.current.clearCaptionViewHandle(captionHandle);
     }
@@ -319,7 +282,7 @@ export default function PlayerScreen() {
       <SpatialNavigationRoot isActive={isFocused}>
         <View style={styles.container}>
           <View style={styles.errorContainer}>
-            <ExitButton onSelect={navigateBack} />
+            <FocusablePressable text="Exit" onSelect={navigateBack} />
           </View>
         </View>
       </SpatialNavigationRoot>
@@ -329,7 +292,6 @@ export default function PlayerScreen() {
   return (
     <SpatialNavigationRoot isActive={isFocused}>
       <View style={styles.container}>
-        {/* Kepler Video Player with native surface rendering */}
         <VideoPlayer
           movie={movie}
           headerImage={headerImage}
@@ -341,7 +303,6 @@ export default function PlayerScreen() {
           isVideoInitialized={isVideoInitialized}
         />
 
-        {/* Custom controls overlay with buffering indicator */}
         {!!durationRef.current && (
           <VideoOverlay
             visible={controlsVisible}
@@ -351,6 +312,10 @@ export default function PlayerScreen() {
             currentTime={currentTime}
             duration={durationRef.current}
             isBuffering={isVideoBuffering}
+            title={title}
+            chapters={chapters}
+            seekPreviewTime={seekPreviewTime}
+            seekPreviewDirection={seekPreviewDirection}
           />
         )}
       </View>

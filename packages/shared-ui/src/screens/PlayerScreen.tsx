@@ -10,6 +10,10 @@ import VideoOverlay from '../components/player/VideoOverlay';
 import { VideoRef } from 'react-native-video';
 import VideoPlayer from '../components/player/VideoPlayer';
 import { RootStackParamList } from '../navigation/types';
+import type { ChapterMarker } from '../types/player';
+import JellyfinClient from '../services/JellyfinClient';
+import { useAutoHideControls } from '../hooks/useAutoHideControls';
+import { useSeekManager } from '../hooks/useSeekManager';
 
 const SHOW_NATIVE_CONTROLS = Platform.OS === 'ios';
 
@@ -19,38 +23,37 @@ type PlayerScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 
 export default function PlayerScreen() {
   const route = useRoute<PlayerScreenRouteProp>();
   const navigation = useNavigation<PlayerScreenNavigationProp>();
-  const { movie, headerImage } = route.params;
+  const { movie, headerImage, title, itemId, accessToken, userId } = route.params;
   const isFocused = useIsFocused();
+
   const [paused, setPaused] = useState<boolean>(false);
-  const [controlsVisible, setControlsVisible] = useState<boolean>(false);
   const [isVideoBuffering, setIsVideoBuffering] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
+  const [chapters, setChapters] = useState<ChapterMarker[]>([]);
+
   const videoRef = useRef<VideoRef>(null);
-  const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentTimeRef = useRef<number>(0);
   const durationRef = useRef<number>(0);
 
-  const showControls = useCallback(() => {
-    setControlsVisible(true);
+  const [controlsVisible, showControls] = useAutoHideControls();
 
-    if (hideControlsTimeoutRef.current) {
-      clearTimeout(hideControlsTimeoutRef.current);
+  // Fetch chapters on mount
+  useEffect(() => {
+    if (itemId && accessToken && userId) {
+      JellyfinClient.getChapters(accessToken, userId, itemId)
+        .then((ch) => setChapters(ch ?? []))
+        .catch(() => {
+          // Chapters are non-critical; fail silently
+        });
     }
-    hideControlsTimeoutRef.current = setTimeout(() => {
-      setControlsVisible(false);
-    }, 5000);
-  }, []);
+  }, [itemId, accessToken, userId]);
 
   const seek = useCallback((time: number) => {
-    if (time < 0) {
-      time = 0;
-    } else if (time > durationRef.current) {
-      time = durationRef.current;
-    }
-    videoRef.current?.seek(time);
-    currentTimeRef.current = time;
-    setCurrentTime(time);
+    const clamped = Math.max(0, Math.min(time, durationRef.current));
+    videoRef.current?.seek(clamped);
+    currentTimeRef.current = clamped;
+    setCurrentTime(clamped);
     showControls();
   }, [showControls]);
 
@@ -59,20 +62,32 @@ export default function PlayerScreen() {
     showControls();
   }, [showControls]);
 
+  const { seekPreviewTime, seekPreviewDirection, startAcceleratedSeek, stopAcceleratedSeek } =
+    useSeekManager(currentTime, duration, seek);
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
   useEffect(() => {
     if (SHOW_NATIVE_CONTROLS) return;
 
     const handleKeyDown = (key: SupportedKeys) => {
       switch (key) {
         case SupportedKeys.Right:
-        case SupportedKeys.Rewind:
-          seek(currentTimeRef.current + 10);
+        case SupportedKeys.FastForward:
+          startAcceleratedSeek(1);
           break;
         case SupportedKeys.Left:
-        case SupportedKeys.FastForward:
-          seek(currentTimeRef.current - 10);
+        case SupportedKeys.Rewind:
+          startAcceleratedSeek(-1);
           break;
         case SupportedKeys.Back:
+          stopAcceleratedSeek();
           navigation.goBack();
           break;
         case SupportedKeys.PlayPause:
@@ -84,11 +99,19 @@ export default function PlayerScreen() {
       }
     };
 
+    const handleKeyUp = (key: SupportedKeys) => {
+      if (key === SupportedKeys.Right || key === SupportedKeys.Left ||
+          key === SupportedKeys.FastForward || key === SupportedKeys.Rewind) {
+        stopAcceleratedSeek();
+      }
+    };
+
     const listener = RemoteControlManager.addKeydownListener(handleKeyDown);
     return () => {
       RemoteControlManager.removeKeydownListener(listener);
+      stopAcceleratedSeek();
     };
-  }, [seek, togglePausePlay, showControls, navigation]);
+  }, [seek, togglePausePlay, showControls, navigation, startAcceleratedSeek, stopAcceleratedSeek]);
 
   return (
     <SpatialNavigationRoot isActive={isFocused && Platform.OS === 'android'}>
@@ -100,7 +123,10 @@ export default function PlayerScreen() {
           paused={paused}
           controls={SHOW_NATIVE_CONTROLS}
           onBuffer={setIsVideoBuffering}
-          onProgress={setCurrentTime}
+          onProgress={(t) => {
+            setCurrentTime(t);
+            currentTimeRef.current = t;
+          }}
           onLoad={(d) => {
             durationRef.current = d;
             setDuration(d);
@@ -121,6 +147,10 @@ export default function PlayerScreen() {
             currentTime={currentTime}
             duration={duration}
             isBuffering={isVideoBuffering}
+            title={title}
+            chapters={chapters}
+            seekPreviewTime={seekPreviewTime}
+            seekPreviewDirection={seekPreviewDirection}
           />
         )}
       </Pressable>
