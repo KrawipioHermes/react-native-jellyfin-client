@@ -11,7 +11,7 @@ export interface ExpoAppNavigatorProps {
 
 export default function ExpoAppNavigator({ fontsLoaded = true, onReady }: ExpoAppNavigatorProps) {
   useEffect(() => {
-    if (Platform.isTV) {
+    if (Platform.isTV || Platform.OS === 'web') {
       try {
         require('@multi-tv/shared-ui/src/app/configureRemoteControl');
       } catch (error) {

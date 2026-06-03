@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { View, Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet, Pressable } from 'react-native';
 import { SpatialNavigationRoot } from 'react-tv-space-navigation';
 import { useIsFocused } from '@react-navigation/native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -25,6 +25,7 @@ export default function PlayerScreen() {
   const [controlsVisible, setControlsVisible] = useState<boolean>(false);
   const [isVideoBuffering, setIsVideoBuffering] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
   const videoRef = useRef<VideoRef>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentTimeRef = useRef<number>(0);
@@ -89,16 +90,9 @@ export default function PlayerScreen() {
     };
   }, [seek, togglePausePlay, showControls, navigation]);
 
-  // Show controls when video starts
-  useEffect(() => {
-    if (durationRef.current && !SHOW_NATIVE_CONTROLS) {
-      showControls();
-    }
-  }, [durationRef.current, showControls]);
-
   return (
     <SpatialNavigationRoot isActive={isFocused && Platform.OS === 'android'}>
-      <View style={playerStyles.container}>
+      <Pressable style={playerStyles.container} onPress={showControls}>
         <VideoPlayer
           ref={videoRef}
           movie={movie}
@@ -107,25 +101,29 @@ export default function PlayerScreen() {
           controls={SHOW_NATIVE_CONTROLS}
           onBuffer={setIsVideoBuffering}
           onProgress={setCurrentTime}
-          onLoad={(duration) => (durationRef.current = duration)}
+          onLoad={(d) => {
+            durationRef.current = d;
+            setDuration(d);
+            if (!SHOW_NATIVE_CONTROLS) showControls();
+          }}
           onEnd={() => {
             setPaused(true);
             navigation.goBack();
           }}
         />
 
-        {!SHOW_NATIVE_CONTROLS && !!durationRef.current && (
+        {!SHOW_NATIVE_CONTROLS && !!duration && (
           <VideoOverlay
             visible={controlsVisible}
             paused={paused}
             onPlayPause={togglePausePlay}
             onExit={() => navigation.goBack()}
             currentTime={currentTime}
-            duration={durationRef.current}
+            duration={duration}
             isBuffering={isVideoBuffering}
           />
         )}
-      </View>
+      </Pressable>
     </SpatialNavigationRoot>
   );
 }
@@ -134,11 +132,5 @@ const playerStyles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: '#000',
-    },
-    controlsContainer: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'space-between',
-      zIndex: 1,
     },
   });

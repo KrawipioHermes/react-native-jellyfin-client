@@ -1,6 +1,6 @@
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { StyleSheet, View, Image, Text } from 'react-native';
+import { StyleSheet, View, Image, Text, Platform } from 'react-native';
 import { SpatialNavigationRoot, DefaultFocus } from 'react-tv-space-navigation';
 import { scaledPixels } from '../hooks/useScale';
 import { useCallback, useMemo, useState, useRef } from 'react';
@@ -91,6 +91,13 @@ export default function DetailsScreen() {
     <SpatialNavigationRoot isActive={isFocused}>
       <View style={detailsStyles.container}>
         <Image source={imageSource} style={detailsStyles.backgroundImage} />
+        {Platform.OS === 'web' && (
+          <FocusablePressable
+            text="← Back"
+            onSelect={() => navigation.goBack()}
+            style={detailsStyles.backButton}
+          />
+        )}
         <View style={detailsStyles.contentContainer}>
           <View style={detailsStyles.topContent}>
             <Text style={detailsStyles.title}>{title}</Text>
@@ -163,6 +170,12 @@ const detailsStyles = StyleSheet.create({
       width: '100%',
       height: '100%',
       opacity: 0.25,
+    },
+    backButton: {
+      position: 'absolute',
+      top: scaledPixels(safeZones.actionSafe.vertical),
+      start: scaledPixels(safeZones.actionSafe.horizontal),
+      zIndex: 10,
     },
     contentContainer: {
       flex: 1,
