@@ -24,28 +24,42 @@ import Element from '../store/hlsjsplayer/polyfills/ElementPolyfill';
 import TextDecoderPolyfill from '../store/hlsjsplayer/polyfills/TextDecoderPolyfill';
 import W3CMediaPolyfill from '../store/hlsjsplayer/polyfills/W3CMediaPolyfill';
 import MiscPolyfill from '../store/hlsjsplayer/polyfills/MiscPolyfill';
+import type { ChapterMarker } from '@multi-tv/shared-ui/src/components/player/SeekBar';
+import { useSelector } from 'react-redux';
+import JellyfinClient from '@multi-tv/shared-ui/src/services/JellyfinClient';
 
 type PlayerScreenRouteProp = RouteProp<RootStackParamList, 'Player'>;
 type PlayerScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Player'>;
 
+/** Seek acceleration levels (seconds per step) */
+const SEEK_ACCELERATION = [10, 30, 60] as const;
+/** Hold duration (ms) before next acceleration level kicks in */
+const ACCELERATION_INTERVAL = 800;
+
 export default function VegaPlayerScreen() {
   const route = useRoute<PlayerScreenRouteProp>();
   const navigation = useNavigation<PlayerScreenNavigationProp>();
-  const { movie } = route.params;
+  const { movie, title, itemId } = route.params;
   const isFocused = useIsFocused();
 
   const keplerAppStateManager: IKeplerAppStateManager = useKeplerAppStateManager();
   const componentInstance = keplerAppStateManager.getComponentInstance();
 
+  // Get auth from Redux store
+  const { accessToken, userId } = useSelector((state: any) => state.jellyfin);
+
   const [paused, setPaused] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(false);
   const [isVideoBuffering, setIsVideoBuffering] = useState(true);
-  const [isPlayerReady, setIsPlayerReady] = useState(false);   // surface gate: true after vp.initialize()
-  const [isVideoInitialized, setIsVideoInitialized] = useState(false); // controls gate: true after loadedmetadata
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
+  const [isVideoInitialized, setIsVideoInitialized] = useState(false);
   const [isVideoEnded, setIsVideoEnded] = useState(false);
   const [isVideoError, setIsVideoError] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [chapters, setChapters] = useState<ChapterMarker[]>([]);
+  const [seekPreviewTime, setSeekPreviewTime] = useState<number | undefined>();
+  const [seekPreviewDirection, setSeekPreviewDirection] = useState<"forward" | "backward" | undefined>();
 
   const videoPlayerRef = useRef<VideoPlayer | null>(null);
   const hlsPlayerRef = useRef<HlsJsPlayer | null>(null);
@@ -57,8 +71,25 @@ export default function VegaPlayerScreen() {
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
 
+  // Accelerated seeking state
+  const seekHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const seekLevelRef = useRef<number>(0);
+  const seekDirectionRef = useRef<1 | -1>(1);
+  const seekActiveRef = useRef<boolean>(false);
+
   useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
   useEffect(() => { durationRef.current = duration; }, [duration]);
+
+  // Fetch chapters on mount
+  useEffect(() => {
+    if (itemId && accessToken && userId) {
+      JellyfinClient.getChapters(accessToken, userId, itemId)
+        .then((ch) => setChapters(ch ?? []))
+        .catch(() => {
+          // Chapters are non-critical; fail silently
+        });
+    }
+  }, [itemId, accessToken, userId]);
 
   const showControls = useCallback(() => {
     setControlsVisible(true);
@@ -87,6 +118,46 @@ export default function VegaPlayerScreen() {
     }
     showControls();
   }, [showControls]);
+
+  /**
+   * Start accelerated seeking — stages: 10s → 30s → 60s on DPad hold
+   */
+  const startAcceleratedSeek = useCallback((direction: 1 | -1) => {
+    seekDirectionRef.current = direction;
+    seekLevelRef.current = 0;
+    seekActiveRef.current = true;
+
+    // First seek: 10s
+    const delta = SEEK_ACCELERATION[0] * direction;
+    const target = currentTimeRef.current + delta;
+    seek(target);
+    setSeekPreviewTime(target);
+    setSeekPreviewDirection(direction === 1 ? "forward" : "backward");
+
+    // Accelerate after hold interval
+    if (seekHoldTimerRef.current) clearTimeout(seekHoldTimerRef.current);
+    const escalate = () => {
+      if (!seekActiveRef.current) return;
+      seekLevelRef.current = Math.min(seekLevelRef.current + 1, SEEK_ACCELERATION.length - 1);
+      const newDelta = SEEK_ACCELERATION[seekLevelRef.current] * direction;
+      const newTarget = currentTimeRef.current + newDelta;
+      seek(newTarget);
+      setSeekPreviewTime(newTarget);
+    };
+    seekHoldTimerRef.current = setTimeout(escalate, ACCELERATION_INTERVAL);
+  }, [seek]);
+
+  const stopAcceleratedSeek = useCallback(() => {
+    seekActiveRef.current = false;
+    if (seekHoldTimerRef.current) {
+      clearTimeout(seekHoldTimerRef.current);
+      seekHoldTimerRef.current = null;
+    }
+    setTimeout(() => {
+      setSeekPreviewTime(undefined);
+      setSeekPreviewDirection(undefined);
+    }, 500);
+  }, []);
 
   const navigateBack = useCallback(() => {
     if (surfaceHandleRef.current && videoPlayerRef.current) {
@@ -204,13 +275,14 @@ export default function VegaPlayerScreen() {
       switch (key) {
         case SupportedKeys.Right:
         case SupportedKeys.FastForward:
-          seek(currentTimeRef.current + 10);
+          startAcceleratedSeek(1);
           break;
         case SupportedKeys.Left:
         case SupportedKeys.Rewind:
-          seek(currentTimeRef.current - 10);
+          startAcceleratedSeek(-1);
           break;
         case SupportedKeys.Back:
+          stopAcceleratedSeek();
           navigateBack();
           break;
         case SupportedKeys.PlayPause:
@@ -231,8 +303,9 @@ export default function VegaPlayerScreen() {
     return () => {
       RemoteControlManager.removeKeydownListener(listener);
       backHandler.remove();
+      stopAcceleratedSeek();
     };
-  }, [seek, togglePausePlay, showControls, navigateBack]);
+  }, [seek, togglePausePlay, showControls, navigateBack, startAcceleratedSeek, stopAcceleratedSeek]);
 
   const onSurfaceViewCreated = useCallback((surfaceHandle: string) => {
     surfaceHandleRef.current = surfaceHandle;
@@ -306,6 +379,10 @@ export default function VegaPlayerScreen() {
             currentTime={currentTime}
             duration={durationRef.current}
             isBuffering={isVideoBuffering}
+            title={title}
+            chapters={chapters}
+            seekPreviewTime={seekPreviewTime}
+            seekPreviewDirection={seekPreviewDirection}
           />
         )}
       </View>

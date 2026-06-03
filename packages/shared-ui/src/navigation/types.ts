@@ -16,12 +16,14 @@ export type RootStackParamList = {
     userId?: string;
   };
   Player: {
-    movie: string;
-    headerImage: string;
-    format?: string;
-    itemId?: string;
-  };
-};
+      movie: string;
+      headerImage: string;
+      format?: string;
+      itemId?: string;
+      title?: string;
+      accessToken?: string;
+      userId?: string;
+    };
 
 export type DrawerParamList = {
   Home: undefined;

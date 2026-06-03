@@ -1,5 +1,6 @@
 import { Jellyfin } from '@jellyfin/sdk';
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
+import type { ChapterInfo } from '@jellyfin/sdk/lib/generated-client/models';
 import { ItemFields } from '@jellyfin/sdk/lib/generated-client/models';
 import { getItemsApi } from '@jellyfin/sdk/lib/utils/api/items-api';
 import { getMediaInfoApi } from '@jellyfin/sdk/lib/utils/api/media-info-api';
@@ -154,6 +155,24 @@ const getPlaybackUrl = async (
 const getItemImageUrl = (itemId: string): string =>
   `${SERVER_URL}/Items/${itemId}/Images/Primary`;
 
+/**
+ * Fetch chapter markers for a given item from the Jellyfin API.
+ * Chapters provide named time ranges (e.g. "Chapter 1", "Introduction") that
+ * are embedded in many video files.
+ */
+const getChapters = async (
+  token: string,
+  userId: string,
+  itemId: string,
+): Promise<ChapterInfo[]> => {
+  const api = authApi(token);
+  const response = await api.axiosInstance.get<ChapterInfo[]>(
+    `${api.basePath}/Items/${itemId}/Chapters?userId=${encodeURIComponent(userId)}`,
+    { headers: { Authorization: api.authorizationHeader } },
+  );
+  return response.data ?? [];
+};
+
 export default {
   SERVER_URL,
   initiateQuickConnect,
@@ -163,5 +182,6 @@ export default {
   getLibraryItems,
   getPlaybackUrl,
   getItemImageUrl,
+  getChapters,
   COLLECTION_TYPE_TO_ITEM_KIND,
 };

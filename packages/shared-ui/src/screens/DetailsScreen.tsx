@@ -72,11 +72,15 @@ export default function DetailsScreen() {
           headerImage: headerImage,
           format,
           itemId: movie,
+          title,
+          accessToken,
+          userId,
         });
       } else {
         navigation.navigate('Player', {
           movie: movie,
           headerImage: headerImage,
+          title,
         });
       }
     } catch (e) {
