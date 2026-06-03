@@ -6,7 +6,20 @@ export type DrawerParamList = {
 };
 
 export type RootStackParamList = {
+  JellyfinLogin: undefined;
   Main: undefined;
-  Details: { itemId: string };
+  Details: {
+    title: string;
+    description: string;
+    headerImage: string;
+    movie: string;
+    category?: string;
+    genres?: string[];
+    releaseYear?: number;
+    rating?: number;
+    ratingCount?: number;
+    contentRating?: string;
+    duration?: number;
+  };
   Player: { videoId: string };
 };

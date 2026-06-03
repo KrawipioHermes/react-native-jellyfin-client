@@ -1,11 +1,28 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import type { Store } from '@reduxjs/toolkit';
+import { Provider } from 'react-redux';
 import VegaAppNavigator from './navigation/VegaAppNavigator';
-import '../../../packages/shared-ui/src/app/configureRemoteControl';
+import { initializeStore } from './store';
 
 export const App = () => {
-  return <VegaAppNavigator fontsLoaded={true} />;
+  const [store, setStore] = useState<Store | null>(null);
+
+  const initStore = async () => {
+    const initializedStore = await initializeStore();
+    setStore(initializedStore);
+  };
+
+  useEffect(() => {
+    initStore();
+  }, []);
+
+  if (!store) {
+    return null;
+  }
+
+  return (
+    <Provider store={store}>
+      <VegaAppNavigator fontsLoaded={true} />
+    </Provider>
+  );
 };
- 
