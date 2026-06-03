@@ -21,6 +21,11 @@ config.resolver = {
   extraNodeModules: {
     '@multi-tv/shared-ui': path.resolve(__dirname, '../../packages/shared-ui/src'),
   },
+  // Make Metro pick the browser-compatible axios build on web.
+  // Axios exports: browser/react-native → dist/browser/axios.cjs, default → dist/node/axios.cjs
+  // Without this, Metro on web falls through to 'default' and loads the Node.js http adapter,
+  // which doesn't exist in a browser context and throws before any request is made.
+  unstable_conditionNames: ['browser', 'require', 'react-native'],
 };
 
 // When enabled, the optional code below will allow Metro to resolve
