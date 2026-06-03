@@ -1,20 +1,28 @@
+import { URL as URLPolyfill, URLSearchParams } from 'react-native-url-polyfill';
+import 'fastestsmallesttextencoderdecoder';
+import 'base-64';
+
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import { AppNavigator } from '@multi-tv/shared-ui';
+import { useEffect, useState } from 'react';
+import { Provider } from 'react-redux';
+import type { Store } from '@reduxjs/toolkit';
 import { LogBox } from 'react-native';
-import '../../packages/shared-ui/src/app/configureRemoteControl';
+import ExpoAppNavigator from './src/navigation/ExpoAppNavigator';
+import { initializeStore } from './src/store';
 
-// Suppress specific deprecation warnings that don't affect functionality
-// These warnings come from libraries using deprecated React methods
+const _nativeURL = globalThis.URL;
+globalThis.URL = URLPolyfill;
+globalThis.URLSearchParams = URLSearchParams;
+if (_nativeURL?.createObjectURL) globalThis.URL.createObjectURL = _nativeURL.createObjectURL;
+if (_nativeURL?.revokeObjectURL) globalThis.URL.revokeObjectURL = _nativeURL.revokeObjectURL;
+
 if (__DEV__) {
-  // Suppress in LogBox
   LogBox.ignoreLogs([
     /findNodeHandle is deprecated/,
     /findHostInstance_DEPRECATED is deprecated/,
   ]);
 
-  // Also suppress at console level for warnings that slip through
   const originalWarn = console.warn;
   console.warn = (...args) => {
     const message = args[0]?.toString() || '';
@@ -28,13 +36,22 @@ if (__DEV__) {
   };
 }
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function App() {
+  const [store, setStore] = useState<Store | null>(null);
   const [loaded, error] = useFonts({
     SpaceMono: require('./assets/fonts/SpaceMono-Regular.ttf'),
   });
+
+  const initStore = async () => {
+    const initializedStore = await initializeStore();
+    setStore(initializedStore);
+  };
+
+  useEffect(() => {
+    initStore();
+  }, []);
 
   useEffect(() => {
     if (loaded || error) {
@@ -45,5 +62,13 @@ export default function App() {
     }
   }, [loaded, error]);
 
-  return <AppNavigator fontsLoaded={loaded || !!error} />;
+  if (!store) {
+    return null;
+  }
+
+  return (
+    <Provider store={store}>
+      <ExpoAppNavigator fontsLoaded={loaded || !!error} />
+    </Provider>
+  );
 }

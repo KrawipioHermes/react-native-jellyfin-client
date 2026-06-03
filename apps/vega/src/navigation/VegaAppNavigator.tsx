@@ -12,10 +12,8 @@ export interface VegaAppNavigatorProps {
 
 export default function VegaAppNavigator({ fontsLoaded = true, onReady }: VegaAppNavigatorProps) {
   useEffect(() => {
-    // Import remote control config for TV platforms
     if (Platform.isTV) {
       try {
-        // Note: Remote control configuration from shared-ui may need adaptation for Vega
         require('@multi-tv/shared-ui/src/app/configureRemoteControl');
       } catch (error) {
         console.warn('Remote control configuration not available:', error);

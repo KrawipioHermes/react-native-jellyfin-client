@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import type { NativeStackScreenProps } from '@amazon-devices/react-navigation__native-stack';
-import JellyfinStorage from '../services/jellyfin/JellyfinStorage';
-import type { RootStackParamList } from '../navigation/types';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { JellyfinClient } from '@multi-tv/shared-ui';
+import JellyfinStorage from '../services/jellyfin/JellyfinStorage';
+import type { ExpoRootStackParamList } from '../navigation/types';
 
 const WHITE = '#FFFFFF';
 const BLACK = '#000000';
@@ -18,7 +18,7 @@ const PALE_GRAY = '#999999';
 const STRONG_RED = '#E74C3C';
 const CHARCOAL_GRAY = '#333333';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'JellyfinLogin'>;
+type Props = NativeStackScreenProps<ExpoRootStackParamList, 'JellyfinLogin'>;
 
 const POLL_INTERVAL_MS = 1000;
 

@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigation, useIsFocused, DrawerActions } from '@amazon-devices/react-navigation__native';
-import type { NativeStackNavigationProp } from '@amazon-devices/react-navigation__native-stack';
+import { useNavigation, useIsFocused, DrawerActions } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   SpatialNavigationFocusableView,
   SpatialNavigationNode,
@@ -12,14 +12,13 @@ import {
   DefaultFocus,
 } from 'react-tv-space-navigation';
 import { Direction } from '@bam.tech/lrud';
-import { useMenuContext, scaledPixels, colors, safeZones, getOpenDrawerDirection, PlatformLinearGradient } from '@multi-tv/shared-ui';
-import type { RootStackParamList } from '../navigation/types';
+import { useMenuContext, scaledPixels, colors, safeZones, getOpenDrawerDirection, PlatformLinearGradient, JellyfinClient } from '@multi-tv/shared-ui';
+import type { ExpoRootStackParamList } from '../navigation/types';
 import type { RootState, AppDispatch } from '../store';
 import { loadStoredAuth, fetchLibraries, fetchLibraryItems } from '../store/jellyfinSlice';
-import { JellyfinClient } from '@multi-tv/shared-ui';
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Main'>;
+type NavigationProp = NativeStackNavigationProp<ExpoRootStackParamList, 'Main'>;
 
 const MovieItem = React.memo(
   ({
@@ -52,7 +51,7 @@ const MovieItem = React.memo(
   },
 );
 
-export default function VegaHomeScreen() {
+export default function ExpoHomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useDispatch<AppDispatch>();
   const { isOpen: isMenuOpen, toggleMenu } = useMenuContext();

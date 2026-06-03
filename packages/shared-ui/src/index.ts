@@ -10,6 +10,7 @@ export { default as FocusablePressable } from './components/FocusablePressable';
 export { default as LoadingIndicator } from './components/LoadingIndicator';
 export { MenuProvider, useMenuContext } from './components/MenuContext';
 export { default as CustomDrawerContent } from './components/CustomDrawerContent';
+export { default as PlatformLinearGradient } from './components/PlatformLinearGradient';
 
 // Screens
 export { default as HomeScreen } from './screens/HomeScreen';
@@ -18,6 +19,10 @@ export { default as PlayerScreen } from './screens/PlayerScreen';
 export { default as ExploreScreen } from './screens/ExploreScreen';
 export { default as TVScreen } from './screens/TVScreen';
 export { default as SettingsScreen } from './screens/SettingsScreen';
+
+// Services
+export { default as JellyfinClient } from './services/JellyfinClient';
+export type { QuickConnectResult, JellyfinAuthResult } from './services/JellyfinClient';
 
 // Utils
 export { VideoHandler } from './utils/VideoHandler';
@@ -30,3 +35,6 @@ export * from './navigation/types';
 
 // Hooks
 export { scaledPixels } from './hooks/useScale';
+
+// Remote Control
+export { GoBackConfiguration } from './app/remote-control/GoBackConfiguration';

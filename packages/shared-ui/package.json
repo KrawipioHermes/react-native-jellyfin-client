@@ -11,6 +11,7 @@
     "clean": "rm -rf node_modules"
   },
   "peerDependencies": {
+    "@jellyfin/sdk": "*",
     "@react-navigation/native": "*",
     "react": "*",
     "react-native": "*"
