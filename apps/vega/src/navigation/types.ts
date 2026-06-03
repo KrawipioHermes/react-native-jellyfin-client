@@ -20,6 +20,8 @@ export type RootStackParamList = {
     ratingCount?: number;
     contentRating?: string;
     duration?: number;
+    accessToken?: string;
+    userId?: string;
   };
-  Player: { videoId: string };
+  Player: { movie: string; headerImage: string; format?: string; itemId?: string };
 };

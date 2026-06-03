@@ -148,9 +148,11 @@ export default function VegaHomeScreen() {
         description: item.Overview ?? '',
         headerImage: JellyfinClient.getItemImageUrl(item.Id),
         movie: item.Id,
+        accessToken,
+        userId,
       });
     },
-    [navigation],
+    [navigation, accessToken, userId],
   );
 
   const renderItem = useCallback(

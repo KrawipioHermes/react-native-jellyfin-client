@@ -2,6 +2,7 @@ import { IComponentInstance } from '@amazon-devices/react-native-kepler';
 import { VideoPlayer } from '@amazon-devices/react-native-w3cmedia';
 import React from 'react';
 import { Platform } from 'react-native';
+import { AppOverrideMediaControlHandler } from './AppOverrideMediaControlHandler.kepler';
 
 // Default video resolution settings based on platform (TV vs mobile/web)
 const DEFAULT_ABR_WIDTH: number = Platform.isTV ? 3840 : 1919;
@@ -146,7 +147,6 @@ export class VideoHandler {
         console.info(
           '[VideoHandler] - preBufferVideo - KMC: set Media Control Focus',
         );
-        const { AppOverrideMediaControlHandler } = await import('./AppOverrideMediaControlHandler.kepler');
         await this.videoRef.current.setMediaControlFocus(
           componentInstance,
           new AppOverrideMediaControlHandler(
@@ -182,8 +182,6 @@ export class VideoHandler {
     if (this.videoRef !== null && this.videoRef.current !== null) {
       this.videoRef.current.autoplay = false;
       this.videoRef.current.defaultSeekIntervalInSec = SKIP_INTERVAL_SECONDS;
-
-      // For now, load as static media (MP4). Future enhancement: add Shaka player for HLS/DASH
       this.loadStaticMediaPlayer(this.videoRef.current);
     }
   };
@@ -200,8 +198,13 @@ export class VideoHandler {
     video.src = this.videoUri;
     video.pause();
     console.log(
-      `[VideoHandler] - loadStaticMediaPlayer - Loading with: ${video.src}`,
+      `[VideoHandler] - loadStaticMediaPlayer - Loading ${this.selectedFileType}: ${video.src}`,
     );
+    if (this.selectedFileType === VideoFileTypes.HLS) {
+      console.warn(
+        '[VideoHandler] - HLS playback on Vega may require Shaka Player integration. Attempting native load.',
+      );
+    }
     video.load();
   };
 
@@ -261,8 +264,8 @@ export class VideoHandler {
       this.setCurrentTime(currentTime);
     }
 
-    // For static media (MP4), use timeupdate to hide buffering
-    if (this.selectedFileType === VideoFileTypes.MP4) {
+    // For static media (MP4/HLS via direct src), use timeupdate to hide buffering
+    if (this.selectedFileType === VideoFileTypes.MP4 || this.selectedFileType === VideoFileTypes.HLS) {
       this.setShowBuffering(false);
     }
   };
