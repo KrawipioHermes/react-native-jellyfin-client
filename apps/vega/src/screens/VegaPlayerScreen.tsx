@@ -31,7 +31,7 @@ type PlayerScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 
 export default function VegaPlayerScreen() {
   const route = useRoute<PlayerScreenRouteProp>();
   const navigation = useNavigation<PlayerScreenNavigationProp>();
-  const { movie } = route.params;
+  const { movie, title } = route.params;
   const isFocused = useIsFocused();
 
   const keplerAppStateManager: IKeplerAppStateManager = useKeplerAppStateManager();
@@ -306,6 +306,7 @@ export default function VegaPlayerScreen() {
             currentTime={currentTime}
             duration={durationRef.current}
             isBuffering={isVideoBuffering}
+            title={title}
           />
         )}
       </View>
