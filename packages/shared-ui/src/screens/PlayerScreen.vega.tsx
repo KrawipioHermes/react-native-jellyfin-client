@@ -143,8 +143,10 @@ export default function PlayerScreen() {
       headerImage: JellyfinClient.getItemImageUrl(nextItemId ?? ''),
       itemId: nextItemId ?? undefined,
       title: nextEpisode.Name ?? 'Next Episode',
+      accessToken,
+      userId,
     });
-  }, [nextEpisode, movie, navigation, accessToken]);
+  }, [nextEpisode, movie, navigation, accessToken, userId]);
 
   /**
    * Toggle play/pause
