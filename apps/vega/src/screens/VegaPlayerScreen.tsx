@@ -256,14 +256,14 @@ export default function VegaPlayerScreen() {
       }
     };
 
-    const listener = RemoteControlManager.addKeydownListener(handleKeyDown);
+    const downListener = RemoteControlManager.addKeydownListener(handleKeyDown);
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       navigateBack();
       return true;
     });
 
     return () => {
-      RemoteControlManager.removeKeydownListener(listener);
+      downListener();
       backHandler.remove();
     };
   }, [seek, togglePausePlay, showControls, navigateBack]);
