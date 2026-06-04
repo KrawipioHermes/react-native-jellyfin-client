@@ -14,10 +14,11 @@ interface TopBarProps {
   onExit: () => void;
   onTracks?: () => void;
   hasTracks?: boolean;
+  onSettings?: () => void;
 }
 
 /**
- * Top bar of the video overlay: Exit button + title + time remaining + tracks button.
+ * Top bar of the video overlay: Exit button + title + time remaining + tracks button + settings button.
  */
 const TopBar: React.FC<TopBarProps> = React.memo(({
   title,
@@ -26,6 +27,7 @@ const TopBar: React.FC<TopBarProps> = React.memo(({
   onExit,
   onTracks,
   hasTracks = false,
+  onSettings,
 }) => {
   const timeRemaining = duration > 0 ? duration - currentTime : 0;
 
@@ -54,6 +56,20 @@ const TopBar: React.FC<TopBarProps> = React.memo(({
             <FocusablePressable
               text="Tracks"
               onSelect={onTracks}
+              style={[
+                styles.navButton,
+                isFocused && styles.navButtonFocused,
+              ]}
+            />
+          )}
+        </SpatialNavigationFocusableView>
+      )}
+      {onSettings && (
+        <SpatialNavigationFocusableView>
+          {({ isFocused }) => (
+            <FocusablePressable
+              text="Settings"
+              onSelect={onSettings}
               style={[
                 styles.navButton,
                 isFocused && styles.navButtonFocused,

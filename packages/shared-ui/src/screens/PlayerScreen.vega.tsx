@@ -24,6 +24,7 @@ import { useSeekManager } from '../hooks/useSeekManager';
 import { useMediaTracks } from '../hooks/useMediaTracks';
 import { scaledPixels } from '../hooks/useScale';
 import { safeZones } from '../theme';
+import type { PlaybackSpeed } from '../components/player/SettingsPanel';
 
 type PlayerScreenRouteProp = RouteProp<RootStackParamList, 'Player'>;
 type PlayerScreenNavigationProp = NativeStackNavigationProp<
@@ -58,6 +59,8 @@ export default function PlayerScreen() {
   const [duration, setDuration] = useState<number>(0);
   const [chapters, setChapters] = useState<ChapterMarker[]>([]);
   const [trackSelectorOpen, setTrackSelectorOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
 
   // Refs
   const videoRef = useRef<W3CVideoPlayer | null>(null);
@@ -67,7 +70,7 @@ export default function PlayerScreen() {
   const durationRef = useRef<number>(0);
   const videoHandlerRef = useRef<VideoHandler | null>(null);
 
-  const [controlsVisible, showControls] = useAutoHideControls(5000, trackSelectorOpen);
+  const [controlsVisible, showControls] = useAutoHideControls(5000, trackSelectorOpen || settingsOpen);
 
   // Update refs when state changes
   useEffect(() => {
@@ -103,6 +106,18 @@ export default function PlayerScreen() {
   const handleTrackSelectorToggle = useCallback((open: boolean) => {
     setTrackSelectorOpen(open);
   }, []);
+
+  // Settings panel toggle — pauses auto-hide while panel is open
+  const handleSettingsToggle = useCallback((open: boolean) => {
+    setSettingsOpen(open);
+  }, []);
+
+  // Apply playback speed to the video player when speed changes
+  useEffect(() => {
+    if (videoHandlerRef.current && isVideoInitialized) {
+      videoHandlerRef.current.setPlaybackRate(playbackSpeed);
+    }
+  }, [playbackSpeed, isVideoInitialized]);
 
   /**
    * Seek to a specific time
@@ -340,6 +355,9 @@ export default function PlayerScreen() {
             onSelectAudio={selectAudio}
             onSelectSubtitle={selectSubtitle}
             onTrackSelectorToggle={handleTrackSelectorToggle}
+            playbackSpeed={playbackSpeed}
+            onPlaybackSpeedChange={setPlaybackSpeed}
+            onSettingsToggle={handleSettingsToggle}
           />
         )}
       </View>

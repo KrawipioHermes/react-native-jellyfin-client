@@ -15,6 +15,7 @@ import JellyfinClient from '../services/JellyfinClient';
 import { useAutoHideControls } from '../hooks/useAutoHideControls';
 import { useSeekManager } from '../hooks/useSeekManager';
 import { useMediaTracks } from '../hooks/useMediaTracks';
+import type { PlaybackSpeed } from '../components/player/SettingsPanel';
 
 const SHOW_NATIVE_CONTROLS = Platform.OS === 'ios';
 
@@ -33,12 +34,14 @@ export default function PlayerScreen() {
   const [duration, setDuration] = useState<number>(0);
   const [chapters, setChapters] = useState<ChapterMarker[]>([]);
   const [trackSelectorOpen, setTrackSelectorOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
 
   const videoRef = useRef<VideoRef>(null);
   const currentTimeRef = useRef<number>(0);
   const durationRef = useRef<number>(0);
 
-  const [controlsVisible, showControls] = useAutoHideControls(5000, trackSelectorOpen);
+  const [controlsVisible, showControls] = useAutoHideControls(5000, trackSelectorOpen || settingsOpen);
 
   // Fetch chapters on mount
   useEffect(() => {
@@ -87,6 +90,10 @@ export default function PlayerScreen() {
 
   const handleTrackSelectorToggle = useCallback((open: boolean) => {
     setTrackSelectorOpen(open);
+  }, []);
+
+  const handleSettingsToggle = useCallback((open: boolean) => {
+    setSettingsOpen(open);
   }, []);
 
   const { seekPreviewTime, seekPreviewDirection, startAcceleratedSeek, stopAcceleratedSeek } =
@@ -149,6 +156,7 @@ export default function PlayerScreen() {
           headerImage={headerImage}
           paused={paused}
           controls={SHOW_NATIVE_CONTROLS}
+          rate={playbackSpeed}
           onBuffer={setIsVideoBuffering}
           onProgress={(t) => {
             setCurrentTime(t);
@@ -187,6 +195,9 @@ export default function PlayerScreen() {
             onSelectAudio={selectAudio}
             onSelectSubtitle={selectSubtitle}
             onTrackSelectorToggle={handleTrackSelectorToggle}
+            playbackSpeed={playbackSpeed}
+            onPlaybackSpeedChange={setPlaybackSpeed}
+            onSettingsToggle={handleSettingsToggle}
           />
         )}
       </Pressable>

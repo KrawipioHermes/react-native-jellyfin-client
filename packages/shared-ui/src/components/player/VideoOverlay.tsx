@@ -4,8 +4,10 @@ import TopBar from './TopBar';
 import CenterControls from './CenterControls';
 import BottomBar from './BottomBar';
 import TrackSelectorPanel from './TrackSelectorPanel';
+import SettingsPanel from './SettingsPanel';
 import LoadingIndicator from '../LoadingIndicator';
 import type { ChapterMarker, MediaTrack } from '../../types/player';
+import type { PlaybackSpeed } from './SettingsPanel';
 
 interface VideoOverlayProps {
   visible: boolean;
@@ -27,14 +29,19 @@ interface VideoOverlayProps {
   onSelectAudio?: (index: number | null) => void;
   onSelectSubtitle?: (index: number | null) => void;
   onTrackSelectorToggle?: (open: boolean) => void;
+  // Settings panel props
+  playbackSpeed: PlaybackSpeed;
+  onPlaybackSpeedChange: (speed: PlaybackSpeed) => void;
+  onSettingsToggle?: (open: boolean) => void;
 }
 
 /**
  * TV-friendly overlay with:
- * - TopBar: Exit button + title + time remaining + tracks button
+ * - TopBar: Exit button + title + time remaining + tracks button + settings button
  * - CenterControls: Large play/pause button
  * - BottomBar: Seek bar + time display + seek preview
  * - TrackSelectorPanel: Full-screen audio/subtitle selector (replaces overlay)
+ * - SettingsPanel: Full-screen playback speed selector (replaces overlay)
  * - Loading indicator during buffering
  * - Smooth fade animations
  */
@@ -57,9 +64,13 @@ const VideoOverlay: React.FC<VideoOverlayProps> = React.memo(({
   onSelectAudio,
   onSelectSubtitle,
   onTrackSelectorToggle,
+  playbackSpeed,
+  onPlaybackSpeedChange,
+  onSettingsToggle,
 }) => {
   const opacity = useRef(new Animated.Value(0)).current;
   const [trackSelectorOpen, setTrackSelectorOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     Animated.timing(opacity, {
@@ -79,21 +90,38 @@ const VideoOverlay: React.FC<VideoOverlayProps> = React.memo(({
     onTrackSelectorToggle?.(false);
   };
 
-  // When the overlay hides or controls timer expires, close track selector too
-  useEffect(() => {
-    if (!visible && trackSelectorOpen) {
-      setTrackSelectorOpen(false);
-      onTrackSelectorToggle?.(false);
-    }
-  }, [visible, trackSelectorOpen, onTrackSelectorToggle]);
+  const handleOpenSettings = () => {
+    setSettingsOpen(true);
+    onSettingsToggle?.(true);
+  };
 
-  // Track selector panel replaces the regular overlay when open
+  const handleCloseSettings = () => {
+    setSettingsOpen(false);
+    onSettingsToggle?.(false);
+  };
+
+  // When the overlay hides or controls timer expires, close all panels
+  useEffect(() => {
+    if (!visible) {
+      if (trackSelectorOpen) {
+        setTrackSelectorOpen(false);
+        onTrackSelectorToggle?.(false);
+      }
+      if (settingsOpen) {
+        setSettingsOpen(false);
+        onSettingsToggle?.(false);
+      }
+    }
+  }, [visible, trackSelectorOpen, settingsOpen, onTrackSelectorToggle, onSettingsToggle]);
+
+  // Panels replace the regular overlay when open
   const showTrackSelector = trackSelectorOpen && visible;
+  const showSettings = settingsOpen && visible;
   const hasTracks =
     (audioTracks && audioTracks.length > 0) ||
     (subtitleTracks && subtitleTracks.length > 0);
 
-  if (!visible && !trackSelectorOpen) {
+  if (!visible && !trackSelectorOpen && !settingsOpen) {
     return null;
   }
 
@@ -111,8 +139,16 @@ const VideoOverlay: React.FC<VideoOverlayProps> = React.memo(({
         onClose={handleCloseTracks}
       />
 
-      {/* Regular overlay — hidden when track selector is open */}
-      {!showTrackSelector && (
+      {/* Settings panel takes over the full screen */}
+      <SettingsPanel
+        visible={showSettings}
+        playbackSpeed={playbackSpeed}
+        onSelectSpeed={onPlaybackSpeedChange}
+        onClose={handleCloseSettings}
+      />
+
+      {/* Regular overlay — hidden when a panel is open */}
+      {!showTrackSelector && !showSettings && (
         <>
           {isBuffering && <LoadingIndicator />}
 
@@ -123,6 +159,7 @@ const VideoOverlay: React.FC<VideoOverlayProps> = React.memo(({
             onExit={onExit}
             onTracks={handleOpenTracks}
             hasTracks={hasTracks}
+            onSettings={handleOpenSettings}
           />
 
           <CenterControls
