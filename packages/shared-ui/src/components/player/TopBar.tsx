@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { SpatialNavigationFocusableView } from 'react-tv-space-navigation';
 import FocusablePressable from '../FocusablePressable';
 import { formatTime } from '../../utils/formatTime';
 import { scaledPixels } from '../../hooks/useScale';
@@ -11,25 +12,55 @@ interface TopBarProps {
   currentTime: number;
   duration: number;
   onExit: () => void;
+  onTracks?: () => void;
+  hasTracks?: boolean;
 }
 
 /**
- * Top bar of the video overlay: Exit button + title + time remaining.
+ * Top bar of the video overlay: Exit button + title + time remaining + tracks button.
  */
-const TopBar: React.FC<TopBarProps> = React.memo(({ title, currentTime, duration, onExit }) => {
+const TopBar: React.FC<TopBarProps> = React.memo(({
+  title,
+  currentTime,
+  duration,
+  onExit,
+  onTracks,
+  hasTracks = false,
+}) => {
   const timeRemaining = duration > 0 ? duration - currentTime : 0;
 
   return (
     <View style={styles.container}>
-      <FocusablePressable
-        text="Exit"
-        onSelect={onExit}
-        style={styles.exitButton}
-      />
+      <SpatialNavigationFocusableView>
+        {({ isFocused }) => (
+          <FocusablePressable
+            text="Exit"
+            onSelect={onExit}
+            style={[
+              styles.navButton,
+              isFocused && styles.navButtonFocused,
+            ]}
+          />
+        )}
+      </SpatialNavigationFocusableView>
       {title && (
         <Text style={styles.titleText} numberOfLines={1}>
           {title}
         </Text>
+      )}
+      {onTracks && hasTracks && (
+        <SpatialNavigationFocusableView>
+          {({ isFocused }) => (
+            <FocusablePressable
+              text="Tracks"
+              onSelect={onTracks}
+              style={[
+                styles.navButton,
+                isFocused && styles.navButtonFocused,
+              ]}
+            />
+          )}
+        </SpatialNavigationFocusableView>
       )}
       <Text style={styles.timeRemainingText}>
         -{formatTime(timeRemaining)}
@@ -52,19 +83,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
-  exitButton: {
-    marginEnd: scaledPixels(20),
+  navButton: {
+    paddingHorizontal: scaledPixels(16),
+    paddingVertical: scaledPixels(8),
+    borderRadius: scaledPixels(8),
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  navButtonFocused: {
+    borderColor: colors.primary,
   },
   titleText: {
     flex: 1,
     color: colors.text,
     fontSize: scaledPixels(28),
     fontWeight: '600',
+    marginHorizontal: scaledPixels(12),
   },
   timeRemainingText: {
     color: colors.textSecondary,
     fontSize: scaledPixels(22),
-    marginStart: scaledPixels(20),
+    marginStart: scaledPixels(12),
   },
 });
 
