@@ -12,6 +12,8 @@ import { VideoPlayer as W3CVideoPlayer } from '@amazon-devices/react-native-w3cm
 import RemoteControlManager from '../app/remote-control/RemoteControlManager';
 import { SupportedKeys } from '../app/remote-control/SupportedKeys';
 import VideoOverlay from '../components/player/VideoOverlay';
+import SkipIntroButton from '../components/player/SkipIntroButton';
+import NextEpisodeButton from '../components/player/NextEpisodeButton';
 import FocusablePressable from '../components/FocusablePressable';
 import VideoPlayer from '../components/player/VideoPlayer.vega';
 import { RootStackParamList } from '../navigation/types';
@@ -21,6 +23,8 @@ import JellyfinClient from '../services/JellyfinClient';
 import { useSelector } from 'react-redux';
 import { useAutoHideControls } from '../hooks/useAutoHideControls';
 import { useSeekManager } from '../hooks/useSeekManager';
+import { useSkipIntro } from '../hooks/useSkipIntro';
+import { useNextEpisode } from '../hooks/useNextEpisode';
 import { scaledPixels } from '../hooks/useScale';
 import { safeZones } from '../theme';
 
@@ -106,6 +110,41 @@ export default function PlayerScreen() {
 
   const { seekPreviewTime, seekPreviewDirection, startAcceleratedSeek, stopAcceleratedSeek } =
     useSeekManager(currentTime, duration, seek);
+
+  // Skip intro detection
+  const { show: showSkipIntro, skipToTime } = useSkipIntro(chapters, currentTime);
+
+  // Next episode detection
+  const { show: showNextEpisode, nextEpisode, loading: loadingNextEpisode } = useNextEpisode({
+    itemId,
+    accessToken,
+    userId,
+    currentTime,
+    duration,
+    paused,
+  });
+
+  const handleSkipIntro = useCallback(() => {
+    if (skipToTime != null) {
+      seek(skipToTime);
+    }
+  }, [skipToTime, seek]);
+
+  const handlePlayNextEpisode = useCallback(() => {
+    if (!nextEpisode) return;
+
+    const nextItemId = nextEpisode.Id;
+    const nextMovieUrl = nextEpisode.Id
+      ? `${JellyfinClient.SERVER_URL}/Videos/${nextEpisode.Id}/stream?static=true`
+      : movie;
+
+    navigation.replace('Player', {
+      movie: nextMovieUrl,
+      headerImage: JellyfinClient.getItemImageUrl(nextItemId ?? ''),
+      itemId: nextItemId ?? undefined,
+      title: nextEpisode.Name ?? 'Next Episode',
+    });
+  }, [nextEpisode, movie, navigation, accessToken]);
 
   /**
    * Toggle play/pause
@@ -318,6 +357,22 @@ export default function PlayerScreen() {
             seekPreviewDirection={seekPreviewDirection}
           />
         )}
+
+        {/* Skip Intro button — renders independently of VideoOverlay visibility */}
+        <SkipIntroButton
+          visible={showSkipIntro}
+          onSkip={handleSkipIntro}
+        />
+
+        {/* Next Episode button — renders independently of VideoOverlay visibility */}
+        <NextEpisodeButton
+          visible={showNextEpisode}
+          episodeTitle={nextEpisode?.Name}
+          episodeNumber={nextEpisode?.IndexNumber}
+          seasonNumber={nextEpisode?.ParentIndexNumber}
+          loading={loadingNextEpisode}
+          onPlay={handlePlayNextEpisode}
+        />
       </View>
     </SpatialNavigationRoot>
   );

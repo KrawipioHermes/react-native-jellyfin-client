@@ -35,6 +35,19 @@ export * from './navigation/types';
 
 // Hooks
 export { scaledPixels } from './hooks/useScale';
+export { useAutoHideControls } from './hooks/useAutoHideControls';
+export { useSeekManager } from './hooks/useSeekManager';
+export { useSkipIntro } from './hooks/useSkipIntro';
+export { useNextEpisode } from './hooks/useNextEpisode';
+
+// Player Components
+export { default as VideoOverlay } from './components/player/VideoOverlay';
+export { default as TopBar } from './components/player/TopBar';
+export { default as CenterControls } from './components/player/CenterControls';
+export { default as BottomBar } from './components/player/BottomBar';
+export { default as SeekBar } from './components/player/SeekBar';
+export { default as SkipIntroButton } from './components/player/SkipIntroButton';
+export { default as NextEpisodeButton } from './components/player/NextEpisodeButton';
 
 // Remote Control
 export { GoBackConfiguration } from './app/remote-control/GoBackConfiguration';

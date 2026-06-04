@@ -28,6 +28,10 @@ import { useSelector } from 'react-redux';
 import JellyfinClient from '@multi-tv/shared-ui/src/services/JellyfinClient';
 import { useAutoHideControls } from '@multi-tv/shared-ui/src/hooks/useAutoHideControls';
 import { useSeekManager } from '@multi-tv/shared-ui/src/hooks/useSeekManager';
+import { useSkipIntro } from '@multi-tv/shared-ui/src/hooks/useSkipIntro';
+import { useNextEpisode } from '@multi-tv/shared-ui/src/hooks/useNextEpisode';
+import SkipIntroButton from '@multi-tv/shared-ui/src/components/player/SkipIntroButton';
+import NextEpisodeButton from '@multi-tv/shared-ui/src/components/player/NextEpisodeButton';
 import FocusablePressable from '@multi-tv/shared-ui/src/components/FocusablePressable';
 
 type PlayerScreenRouteProp = RouteProp<RootStackParamList, 'Player'>;
@@ -92,6 +96,41 @@ export default function VegaPlayerScreen() {
 
   const { seekPreviewTime, seekPreviewDirection, startAcceleratedSeek, stopAcceleratedSeek } =
     useSeekManager(currentTime, duration, seek);
+
+  // Skip intro detection
+  const { show: showSkipIntro, skipToTime } = useSkipIntro(chapters, currentTime);
+
+  // Next episode detection
+  const { show: showNextEpisode, nextEpisode, loading: loadingNextEpisode } = useNextEpisode({
+    itemId,
+    accessToken,
+    userId,
+    currentTime,
+    duration,
+    paused,
+  });
+
+  const handleSkipIntro = useCallback(() => {
+    if (skipToTime != null) {
+      seek(skipToTime);
+    }
+  }, [skipToTime, seek]);
+
+  const handlePlayNextEpisode = useCallback(() => {
+    if (!nextEpisode) return;
+
+    const nextItemId = nextEpisode.Id;
+    const nextMovieUrl = nextEpisode.Id
+      ? `${JellyfinClient.SERVER_URL}/Videos/${nextEpisode.Id}/stream?static=true`
+      : movie;
+
+    navigation.replace('Player', {
+      movie: nextMovieUrl,
+      headerImage: JellyfinClient.getItemImageUrl(nextItemId ?? ''),
+      itemId: nextItemId ?? undefined,
+      title: nextEpisode.Name ?? 'Next Episode',
+    });
+  }, [nextEpisode, movie, navigation, accessToken]);
 
   const togglePausePlay = useCallback(() => {
     if (!videoPlayerRef.current) return;
@@ -331,6 +370,22 @@ export default function VegaPlayerScreen() {
             seekPreviewDirection={seekPreviewDirection}
           />
         )}
+
+        {/* Skip Intro button — renders independently of VideoOverlay visibility */}
+        <SkipIntroButton
+          visible={showSkipIntro}
+          onSkip={handleSkipIntro}
+        />
+
+        {/* Next Episode button — renders independently of VideoOverlay visibility */}
+        <NextEpisodeButton
+          visible={showNextEpisode}
+          episodeTitle={nextEpisode?.Name}
+          episodeNumber={nextEpisode?.IndexNumber}
+          seasonNumber={nextEpisode?.ParentIndexNumber}
+          loading={loadingNextEpisode}
+          onPlay={handlePlayNextEpisode}
+        />
       </View>
     </SpatialNavigationRoot>
   );
