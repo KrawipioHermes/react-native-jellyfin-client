@@ -264,8 +264,8 @@ export default function VegaPlayerScreen() {
     });
 
     return () => {
-      RemoteControlManager.removeKeydownListener(downListener);
-      RemoteControlManager.removeKeyupListener(upListener);
+      downListener();
+      upListener();
       backHandler.remove();
       stopAcceleratedSeek();
     };
