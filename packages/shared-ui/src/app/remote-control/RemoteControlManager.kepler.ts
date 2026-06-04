@@ -19,6 +19,11 @@ const EVENT_TYPE_MAPPING: Record<string, SupportedKeys> = {
 class RemoteControlManager implements RemoteControlManagerInterface {
   private eventEmitter = mitt<{ keyDown: SupportedKeys; keyUp: SupportedKeys }>();
   private tvEventHandler: any;
+  // Track cleanup functions so removeKeydownListener/removeKeyupListener work
+  // with both the original listener reference and the cleanup function returned
+  // by addKeydownListener/addKeyupListener.
+  private keydownCleanupMap = new Map<() => void, (event: SupportedKeys) => void>();
+  private keyupCleanupMap = new Map<() => void, (event: SupportedKeys) => void>();
 
   constructor() {
     // Initialize TVEventHandler for Vega/Kepler platform
@@ -45,23 +50,49 @@ class RemoteControlManager implements RemoteControlManagerInterface {
 
   addKeydownListener = (listener: (event: SupportedKeys) => void): (() => void) => {
     this.eventEmitter.on('keyDown', listener);
+    const cleanup = () => {
+      this.eventEmitter.off('keyDown', listener);
+      this.keydownCleanupMap.delete(cleanup);
+    };
+    this.keydownCleanupMap.set(cleanup, listener);
     console.log('[RemoteControlManager.kepler] Key listener added');
-    return () => this.eventEmitter.off('keyDown', listener);
+    return cleanup;
   };
 
   removeKeydownListener = (listener: (event: SupportedKeys) => void): void => {
-    this.eventEmitter.off('keyDown', listener);
+    // Check if this is a cleanup function first
+    const original = this.keydownCleanupMap.get(listener as () => void);
+    if (original) {
+      this.eventEmitter.off('keyDown', original);
+      this.keydownCleanupMap.delete(listener as () => void);
+    } else {
+      // Direct listener reference
+      this.eventEmitter.off('keyDown', listener);
+    }
     console.log('[RemoteControlManager.kepler] Key listener removed');
   };
 
   addKeyupListener = (listener: (event: SupportedKeys) => void): (() => void) => {
     this.eventEmitter.on('keyUp', listener);
+    const cleanup = () => {
+      this.eventEmitter.off('keyUp', listener);
+      this.keyupCleanupMap.delete(cleanup);
+    };
+    this.keyupCleanupMap.set(cleanup, listener);
     console.log('[RemoteControlManager.kepler] Key up listener added');
-    return () => this.eventEmitter.off('keyUp', listener);
+    return cleanup;
   };
 
   removeKeyupListener = (listener: (event: SupportedKeys) => void): void => {
-    this.eventEmitter.off('keyUp', listener);
+    // Check if this is a cleanup function first
+    const original = this.keyupCleanupMap.get(listener as () => void);
+    if (original) {
+      this.eventEmitter.off('keyUp', original);
+      this.keyupCleanupMap.delete(listener as () => void);
+    } else {
+      // Direct listener reference
+      this.eventEmitter.off('keyUp', listener);
+    }
     console.log('[RemoteControlManager.kepler] Key up listener removed');
   };
 
