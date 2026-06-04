@@ -60,6 +60,7 @@ export default function VegaPlayerScreen() {
   const surfaceHandleRef = useRef<string | null>(null);
   const hlsReadyRef = useRef(false);
   const canPlayFiredRef = useRef(false);
+  const nearEndRef = useRef(false);
   const captionViewHandleRef = useRef<string | null>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentTimeRef = useRef(0);
@@ -106,12 +107,13 @@ export default function VegaPlayerScreen() {
       videoPlayerRef.current.currentTime = clamped;
       setCurrentTime(clamped);
       currentTimeRef.current = clamped;
+      nearEndRef.current = clamped >= durationRef.current - 2;
       showControls();
     }
   }, [showControls]);
 
   const togglePausePlay = useCallback(() => {
-    if (!videoPlayerRef.current) return;
+    if (!videoPlayerRef.current || !canPlayFiredRef.current) return;
     if (videoPlayerRef.current.paused) {
       videoPlayerRef.current.play();
       setPaused(false);
@@ -160,11 +162,13 @@ export default function VegaPlayerScreen() {
       });
       vp.addEventListener('timeupdate', () => {
         if (cancelled) return;
-        setCurrentTime(vp.currentTime || 0);
+        const ct = vp.currentTime || 0;
+        setCurrentTime(ct);
         setIsVideoBuffering(false);
+        nearEndRef.current = durationRef.current > 0 && ct >= durationRef.current - 2;
       });
       vp.addEventListener('ended', () => {
-        if (cancelled) return;
+        if (cancelled || !nearEndRef.current) return;
         setIsVideoEnded(true);
       });
       vp.addEventListener('waiting', () => {
@@ -195,7 +199,7 @@ export default function VegaPlayerScreen() {
       hlsReadyRef.current = true;
 
       vp.addEventListener('canplay', () => {
-        if (cancelled) return;
+        if (cancelled || canPlayFiredRef.current) return;
         canPlayFiredRef.current = true;
         if (surfaceHandleRef.current && videoPlayerRef.current) {
           videoPlayerRef.current.play();
@@ -210,6 +214,7 @@ export default function VegaPlayerScreen() {
       cancelled = true;
       hlsReadyRef.current = false;
       canPlayFiredRef.current = false;
+      nearEndRef.current = false;
       if (surfaceHandleRef.current && videoPlayerRef.current) {
         videoPlayerRef.current.clearSurfaceHandle(surfaceHandleRef.current);
       }
