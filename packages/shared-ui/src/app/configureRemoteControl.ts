@@ -23,6 +23,6 @@ SpatialNavigation.configureRemoteControl({
   },
 
   remoteControlUnsubscriber: (remoteControlListener) => {
-    RemoteControlManager.removeKeydownListener(remoteControlListener);
+    remoteControlListener();
   },
 });

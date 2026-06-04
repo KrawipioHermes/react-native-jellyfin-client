@@ -37,18 +37,18 @@ class RemoteControlManager implements RemoteControlManagerInterface {
     }
   };
 
-  addKeydownListener = (listener: (event: SupportedKeys) => void): ((event: SupportedKeys) => void) => {
+  addKeydownListener = (listener: (event: SupportedKeys) => void): (() => void) => {
     this.eventEmitter.on('keyDown', listener);
-    return listener;
+    return () => this.eventEmitter.off('keyDown', listener);
   };
 
   removeKeydownListener = (listener: (event: SupportedKeys) => void): void => {
     this.eventEmitter.off('keyDown', listener);
   };
 
-  addKeyupListener = (listener: (event: SupportedKeys) => void): ((event: SupportedKeys) => void) => {
+  addKeyupListener = (listener: (event: SupportedKeys) => void): (() => void) => {
     this.eventEmitter.on('keyUp', listener);
-    return listener;
+    return () => this.eventEmitter.off('keyUp', listener);
   };
 
   removeKeyupListener = (listener: (event: SupportedKeys) => void): void => {

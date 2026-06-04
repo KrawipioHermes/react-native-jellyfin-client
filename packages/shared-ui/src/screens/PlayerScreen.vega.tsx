@@ -278,7 +278,7 @@ export default function PlayerScreen() {
     );
 
     return () => {
-      RemoteControlManager.removeKeydownListener(listener);
+      listener();
       backHandler.remove();
       stopAcceleratedSeek();
     };
