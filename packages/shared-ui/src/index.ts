@@ -24,6 +24,9 @@ export { default as SettingsScreen } from './screens/SettingsScreen';
 export { default as JellyfinClient } from './services/JellyfinClient';
 export type { QuickConnectResult, JellyfinAuthResult } from './services/JellyfinClient';
 
+// Player
+export type { ChapterMarker, MediaTrack } from './types/player';
+
 // Utils
 export { VideoHandler } from './utils/VideoHandler';
 export { isRTL, getOpenDrawerDirection, getCloseDrawerDirection } from './utils/rtl';

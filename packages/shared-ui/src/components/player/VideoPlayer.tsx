@@ -15,6 +15,9 @@ interface VideoPlayerProps {
   onProgress: (currentTime: number) => void;
   onLoad: (duration: number) => void;
   onEnd: () => void;
+  // Track selection props for react-native-video
+  selectedTextTrack?: { type: string; value: string | number };
+  selectedAudioTrack?: { type: string; value: string | number };
 }
 
 const VideoPlayer = React.memo(
@@ -29,6 +32,8 @@ const VideoPlayer = React.memo(
         onProgress,
         onLoad,
         onEnd,
+        selectedTextTrack,
+        selectedAudioTrack,
       },
       ref,
     ) => {
@@ -45,9 +50,20 @@ const VideoPlayer = React.memo(
             : {
                 source: { uri: headerImage },
                 resizeMode: "cover" as const,
-                style: { width: "100%", height: "100%" },
+                style: { width: "100%", height: "100%" } as const,
               },
         [headerImage],
+      );
+
+      // Memoize track selection props to prevent unnecessary re-renders
+      const textTrackConfig = useMemo(
+        () => selectedTextTrack,
+        [selectedTextTrack?.type, selectedTextTrack?.value],
+      );
+
+      const audioTrackConfig = useMemo(
+        () => selectedAudioTrack,
+        [selectedAudioTrack?.type, selectedAudioTrack?.value],
       );
 
       // Calculate video style based on current dimensions
@@ -72,6 +88,8 @@ const VideoPlayer = React.memo(
           onEnd={onEnd}
           poster={posterConfig}
           resizeMode="cover"
+          selectedTextTrack={textTrackConfig}
+          selectedAudioTrack={audioTrackConfig}
         />
       );
     },

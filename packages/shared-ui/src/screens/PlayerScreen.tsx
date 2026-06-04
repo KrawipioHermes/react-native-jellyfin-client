@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Platform, StyleSheet, Pressable } from 'react-native';
 import { SpatialNavigationRoot } from 'react-tv-space-navigation';
 import { useIsFocused } from '@react-navigation/native';
@@ -14,6 +14,7 @@ import type { ChapterMarker } from '../types/player';
 import JellyfinClient from '../services/JellyfinClient';
 import { useAutoHideControls } from '../hooks/useAutoHideControls';
 import { useSeekManager } from '../hooks/useSeekManager';
+import { useMediaTracks } from '../hooks/useMediaTracks';
 
 const SHOW_NATIVE_CONTROLS = Platform.OS === 'ios';
 
@@ -31,12 +32,13 @@ export default function PlayerScreen() {
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
   const [chapters, setChapters] = useState<ChapterMarker[]>([]);
+  const [trackSelectorOpen, setTrackSelectorOpen] = useState(false);
 
   const videoRef = useRef<VideoRef>(null);
   const currentTimeRef = useRef<number>(0);
   const durationRef = useRef<number>(0);
 
-  const [controlsVisible, showControls] = useAutoHideControls();
+  const [controlsVisible, showControls] = useAutoHideControls(5000, trackSelectorOpen);
 
   // Fetch chapters on mount
   useEffect(() => {
@@ -48,6 +50,27 @@ export default function PlayerScreen() {
         });
     }
   }, [itemId, accessToken, userId]);
+
+  // Fetch and manage tracks
+  const {
+    audioTracks,
+    subtitleTracks,
+    selectedAudioIndex,
+    selectedSubtitleIndex,
+    selectAudio,
+    selectSubtitle,
+  } = useMediaTracks(itemId, accessToken, userId);
+
+  // Map selected track indices to react-native-video props
+  const selectedTextTrack = useMemo(() => {
+    if (selectedSubtitleIndex === null || selectedSubtitleIndex === undefined) return undefined;
+    return { type: 'index' as const, value: selectedSubtitleIndex };
+  }, [selectedSubtitleIndex]);
+
+  const selectedAudioTrack = useMemo(() => {
+    if (selectedAudioIndex === null || selectedAudioIndex === undefined) return undefined;
+    return { type: 'index' as const, value: selectedAudioIndex };
+  }, [selectedAudioIndex]);
 
   const seek = useCallback((time: number) => {
     const clamped = Math.max(0, Math.min(time, durationRef.current));
@@ -61,6 +84,10 @@ export default function PlayerScreen() {
     setPaused((prev) => !prev);
     showControls();
   }, [showControls]);
+
+  const handleTrackSelectorToggle = useCallback((open: boolean) => {
+    setTrackSelectorOpen(open);
+  }, []);
 
   const { seekPreviewTime, seekPreviewDirection, startAcceleratedSeek, stopAcceleratedSeek } =
     useSeekManager(currentTime, duration, seek);
@@ -136,6 +163,8 @@ export default function PlayerScreen() {
             setPaused(true);
             navigation.goBack();
           }}
+          selectedTextTrack={selectedTextTrack}
+          selectedAudioTrack={selectedAudioTrack}
         />
 
         {!SHOW_NATIVE_CONTROLS && !!duration && (
@@ -151,6 +180,13 @@ export default function PlayerScreen() {
             chapters={chapters}
             seekPreviewTime={seekPreviewTime}
             seekPreviewDirection={seekPreviewDirection}
+            audioTracks={audioTracks}
+            subtitleTracks={subtitleTracks}
+            selectedAudioIndex={selectedAudioIndex}
+            selectedSubtitleIndex={selectedSubtitleIndex}
+            onSelectAudio={selectAudio}
+            onSelectSubtitle={selectSubtitle}
+            onTrackSelectorToggle={handleTrackSelectorToggle}
           />
         )}
       </Pressable>

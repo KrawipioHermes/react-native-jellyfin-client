@@ -21,6 +21,7 @@ import JellyfinClient from '../services/JellyfinClient';
 import { useSelector } from 'react-redux';
 import { useAutoHideControls } from '../hooks/useAutoHideControls';
 import { useSeekManager } from '../hooks/useSeekManager';
+import { useMediaTracks } from '../hooks/useMediaTracks';
 import { scaledPixels } from '../hooks/useScale';
 import { safeZones } from '../theme';
 
@@ -31,7 +32,7 @@ type PlayerScreenNavigationProp = NativeStackNavigationProp<
 >;
 
 /**
- * PlayerScreen for Vega/Kepler Platform — Enhanced with accelerated seeking + chapter markers
+ * PlayerScreen for Vega/Kepler Platform — Enhanced with accelerated seeking + chapter markers + track selection
  */
 export default function PlayerScreen() {
   const route = useRoute<PlayerScreenRouteProp>();
@@ -56,6 +57,7 @@ export default function PlayerScreen() {
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
   const [chapters, setChapters] = useState<ChapterMarker[]>([]);
+  const [trackSelectorOpen, setTrackSelectorOpen] = useState(false);
 
   // Refs
   const videoRef = useRef<W3CVideoPlayer | null>(null);
@@ -65,7 +67,7 @@ export default function PlayerScreen() {
   const durationRef = useRef<number>(0);
   const videoHandlerRef = useRef<VideoHandler | null>(null);
 
-  const [controlsVisible, showControls] = useAutoHideControls();
+  const [controlsVisible, showControls] = useAutoHideControls(5000, trackSelectorOpen);
 
   // Update refs when state changes
   useEffect(() => {
@@ -86,6 +88,21 @@ export default function PlayerScreen() {
         });
     }
   }, [itemId, accessToken, userId]);
+
+  // Fetch and manage tracks
+  const {
+    audioTracks,
+    subtitleTracks,
+    selectedAudioIndex,
+    selectedSubtitleIndex,
+    selectAudio,
+    selectSubtitle,
+  } = useMediaTracks(itemId, accessToken, userId);
+
+  // Track selector toggle — pauses auto-hide while panel is open
+  const handleTrackSelectorToggle = useCallback((open: boolean) => {
+    setTrackSelectorOpen(open);
+  }, []);
 
   /**
    * Seek to a specific time
@@ -184,7 +201,7 @@ export default function PlayerScreen() {
   useEffect(() => {
     if (isVideoEnded) {
       setPaused(true);
-      setControlsVisible(true);
+      showControls();
       navigateBack();
     }
   }, [isVideoEnded, navigateBack]);
@@ -316,6 +333,13 @@ export default function PlayerScreen() {
             chapters={chapters}
             seekPreviewTime={seekPreviewTime}
             seekPreviewDirection={seekPreviewDirection}
+            audioTracks={audioTracks}
+            subtitleTracks={subtitleTracks}
+            selectedAudioIndex={selectedAudioIndex}
+            selectedSubtitleIndex={selectedSubtitleIndex}
+            onSelectAudio={selectAudio}
+            onSelectSubtitle={selectSubtitle}
+            onTrackSelectorToggle={handleTrackSelectorToggle}
           />
         )}
       </View>

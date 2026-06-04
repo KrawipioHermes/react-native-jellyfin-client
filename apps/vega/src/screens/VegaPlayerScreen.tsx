@@ -28,6 +28,7 @@ import { useSelector } from 'react-redux';
 import JellyfinClient from '@multi-tv/shared-ui/src/services/JellyfinClient';
 import { useAutoHideControls } from '@multi-tv/shared-ui/src/hooks/useAutoHideControls';
 import { useSeekManager } from '@multi-tv/shared-ui/src/hooks/useSeekManager';
+import { useMediaTracks } from '@multi-tv/shared-ui/src/hooks/useMediaTracks';
 import FocusablePressable from '@multi-tv/shared-ui/src/components/FocusablePressable';
 
 type PlayerScreenRouteProp = RouteProp<RootStackParamList, 'Player'>;
@@ -54,6 +55,7 @@ export default function VegaPlayerScreen() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [chapters, setChapters] = useState<ChapterMarker[]>([]);
+  const [trackSelectorOpen, setTrackSelectorOpen] = useState(false);
 
   const videoPlayerRef = useRef<VideoPlayer | null>(null);
   const hlsPlayerRef = useRef<HlsJsPlayer | null>(null);
@@ -64,7 +66,10 @@ export default function VegaPlayerScreen() {
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
 
-  const [controlsVisible, showControls] = useAutoHideControls();
+  const [controlsVisible, showControls] = useAutoHideControls(5000, trackSelectorOpen);
+
+  // Store HLS player ref for track switching
+  const hlsPlayerForTracksRef = useRef<HlsJsPlayer | null>(null);
 
   useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
   useEffect(() => { durationRef.current = duration; }, [duration]);
@@ -79,6 +84,63 @@ export default function VegaPlayerScreen() {
         });
     }
   }, [itemId, accessToken, userId]);
+
+  // Fetch and manage tracks
+  const {
+    audioTracks,
+    subtitleTracks,
+    selectedAudioIndex,
+    selectedSubtitleIndex,
+    selectAudio,
+    selectSubtitle,
+    isDefaultLoaded,
+  } = useMediaTracks(itemId, accessToken, userId);
+
+  // Apply track selection to HlsJsPlayer when selection changes
+  useEffect(() => {
+    const hls = hlsPlayerForTracksRef.current;
+    if (!hls || !isDefaultLoaded) return;
+
+    // Apply audio track selection
+    if (selectedAudioIndex !== null) {
+      const track = audioTracks.find((t) => t.Index === selectedAudioIndex);
+      if (track?.Language) {
+        try {
+          hls.selectAudioLanguage(track.Language);
+        } catch (e) {
+          console.warn('[VegaPlayerScreen] Audio track switch error:', e);
+        }
+      }
+    }
+
+    // Apply subtitle track selection
+    if (selectedSubtitleIndex !== null) {
+      const track = subtitleTracks.find((t) => t.Index === selectedSubtitleIndex);
+      if (track) {
+        try {
+          const textTracks = hls.getTextTracks();
+          const target = textTracks.find(
+            (tt) => tt.language === track.Language || tt.label?.includes(track.DisplayTitle || ''),
+          );
+          if (target) {
+            hls.setTextTrack(target, null);
+          }
+        } catch (e) {
+          console.warn('[VegaPlayerScreen] Subtitle track switch error:', e);
+        }
+      }
+    } else {
+      // Subtitles off — disable all text tracks
+      try {
+        hls.setTextTrack(null, null);
+      } catch {}
+    }
+  }, [selectedAudioIndex, selectedSubtitleIndex, audioTracks, subtitleTracks, isDefaultLoaded]);
+
+  // Track selector toggle — pauses auto-hide while panel is open
+  const handleTrackSelectorToggle = useCallback((open: boolean) => {
+    setTrackSelectorOpen(open);
+  }, []);
 
   const seek = useCallback((time: number) => {
     if (videoPlayerRef.current && durationRef.current) {
@@ -172,6 +234,7 @@ export default function VegaPlayerScreen() {
 
       const hlsPlayer = new HlsJsPlayer(vp);
       hlsPlayerRef.current = hlsPlayer;
+      hlsPlayerForTracksRef.current = hlsPlayer;
       hlsPlayer.addPlayerEventListener('error', () => {
         if (!cancelled) setIsVideoError(true);
       });
@@ -201,6 +264,7 @@ export default function VegaPlayerScreen() {
       }
       hlsPlayerRef.current?.destroy();
       hlsPlayerRef.current = null;
+      hlsPlayerForTracksRef.current = null;
       videoPlayerRef.current?.deinitialize();
       (global as any).gmedia = null;
       videoPlayerRef.current = null;
@@ -329,6 +393,13 @@ export default function VegaPlayerScreen() {
             chapters={chapters}
             seekPreviewTime={seekPreviewTime}
             seekPreviewDirection={seekPreviewDirection}
+            audioTracks={audioTracks}
+            subtitleTracks={subtitleTracks}
+            selectedAudioIndex={selectedAudioIndex}
+            selectedSubtitleIndex={selectedSubtitleIndex}
+            onSelectAudio={selectAudio}
+            onSelectSubtitle={selectSubtitle}
+            onTrackSelectorToggle={handleTrackSelectorToggle}
           />
         )}
       </View>
