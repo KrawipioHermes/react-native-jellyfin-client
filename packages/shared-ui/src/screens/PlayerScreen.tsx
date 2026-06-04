@@ -16,6 +16,10 @@ import { useAutoHideControls } from '../hooks/useAutoHideControls';
 import { useSeekManager } from '../hooks/useSeekManager';
 import { useMediaTracks } from '../hooks/useMediaTracks';
 import type { PlaybackSpeed } from '../components/player/SettingsPanel';
+import { useSkipIntro } from '../hooks/useSkipIntro';
+import { useNextEpisode } from '../hooks/useNextEpisode';
+import SkipIntroButton from '../components/player/SkipIntroButton';
+import NextEpisodeButton from '../components/player/NextEpisodeButton';
 
 const SHOW_NATIVE_CONTROLS = Platform.OS === 'ios';
 
@@ -98,6 +102,43 @@ export default function PlayerScreen() {
 
   const { seekPreviewTime, seekPreviewDirection, startAcceleratedSeek, stopAcceleratedSeek } =
     useSeekManager(currentTime, duration, seek);
+
+  // Skip intro detection
+  const { show: showSkipIntro, skipToTime } = useSkipIntro(chapters, currentTime);
+
+  // Next episode detection
+  const { show: showNextEpisode, nextEpisode, loading: loadingNextEpisode } = useNextEpisode({
+    itemId,
+    accessToken,
+    userId,
+    currentTime,
+    duration,
+    paused,
+  });
+
+  const handleSkipIntro = useCallback(() => {
+    if (skipToTime != null) {
+      seek(skipToTime);
+    }
+  }, [skipToTime, seek]);
+
+  const handlePlayNextEpisode = useCallback(() => {
+    if (!nextEpisode) return;
+
+    const nextItemId = nextEpisode.Id;
+    const nextMovieUrl = nextEpisode.Id
+      ? `${JellyfinClient.SERVER_URL}/Videos/${nextEpisode.Id}/stream?static=true`
+      : movie;
+
+    navigation.replace('Player', {
+      movie: nextMovieUrl,
+      headerImage: JellyfinClient.getItemImageUrl(nextItemId ?? ''),
+      itemId: nextItemId ?? undefined,
+      title: nextEpisode.Name ?? 'Next Episode',
+      accessToken,
+      userId,
+    });
+  }, [nextEpisode, movie, navigation, accessToken, userId]);
 
   useEffect(() => {
     currentTimeRef.current = currentTime;
@@ -200,6 +241,26 @@ export default function PlayerScreen() {
             playbackSpeed={playbackSpeed}
             onPlaybackSpeedChange={setPlaybackSpeed}
             onSettingsToggle={handleSettingsToggle}
+          />
+        )}
+
+        {/* Skip Intro button — renders independently of VideoOverlay visibility */}
+        {!SHOW_NATIVE_CONTROLS && (
+          <SkipIntroButton
+            visible={showSkipIntro}
+            onSkip={handleSkipIntro}
+          />
+        )}
+
+        {/* Next Episode button — renders independently of VideoOverlay visibility */}
+        {!SHOW_NATIVE_CONTROLS && (
+          <NextEpisodeButton
+            visible={showNextEpisode}
+            episodeTitle={nextEpisode?.Name}
+            episodeNumber={nextEpisode?.IndexNumber}
+            seasonNumber={nextEpisode?.ParentIndexNumber}
+            loading={loadingNextEpisode}
+            onPlay={handlePlayNextEpisode}
           />
         )}
       </Pressable>

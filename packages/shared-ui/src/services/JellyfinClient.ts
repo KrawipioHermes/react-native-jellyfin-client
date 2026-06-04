@@ -5,6 +5,8 @@ import { ItemFields } from '@jellyfin/sdk/lib/generated-client/models';
 import { getItemsApi } from '@jellyfin/sdk/lib/utils/api/items-api';
 import { getMediaInfoApi } from '@jellyfin/sdk/lib/utils/api/media-info-api';
 import { getUserViewsApi } from '@jellyfin/sdk/lib/utils/api/user-views-api';
+import { getTvShowsApi } from '@jellyfin/sdk/lib/utils/api/tv-shows-api';
+import type { ChapterMarker } from '../types/player';
 
 export const SERVER_URL = 'http://192.168.1.13:8096';
 
@@ -213,7 +215,7 @@ const getChapters = async (
   token: string,
   userId: string,
   itemId: string,
-): Promise<import('../../types/player').ChapterMarker[]> => {
+): Promise<ChapterMarker[]> => {
   const api = authApi(token);
   const response = await getMediaInfoApi(api).getPostedPlaybackInfo({
     itemId,
@@ -225,7 +227,59 @@ const getChapters = async (
   });
 
   const mediaSource = response.data.MediaSources?.[0];
-  return (mediaSource?.Chapters as any[]) ?? [];
+  return (mediaSource?.Chapters as ChapterMarker[]) ?? [];
+};
+
+/**
+ * Fetch a single item by ID (for next-episode item metadata).
+ */
+const getItem = async (
+  accessToken: string,
+  itemId: string,
+): Promise<BaseItemDto | null> => {
+  const api = authApi(accessToken);
+  try {
+    const response = await getItemsApi(api).getItems({
+      userId: '',
+      ids: [itemId],
+      fields: [
+        ItemFields.Overview,
+        ItemFields.Genres,
+        ItemFields.Providers,
+      ],
+      limit: 1,
+    });
+    return response.data.Items?.[0] ?? null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Fetch the next up episode for a given series (for next-episode button).
+ */
+const getNextUp = async (
+  accessToken: string,
+  userId: string,
+  seriesId: string,
+): Promise<BaseItemDto | null> => {
+  const api = authApi(accessToken);
+  try {
+    const response = await getTvShowsApi(api).getNextUp({
+      userId,
+      seriesId,
+      limit: 1,
+      fields: [
+        ItemFields.Overview,
+        ItemFields.Genres,
+        ItemFields.Providers,
+      ],
+    });
+    return response.data.Items?.[0] ?? null;
+  } catch {
+    return null;
+  }
+};
 };
 
 export default {
@@ -239,5 +293,7 @@ export default {
   getItemImageUrl,
   getMediaTracks,
   getChapters,
+  getItem,
+  getNextUp,
   COLLECTION_TYPE_TO_ITEM_KIND,
 };
