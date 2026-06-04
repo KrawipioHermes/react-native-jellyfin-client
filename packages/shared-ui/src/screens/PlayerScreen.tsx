@@ -135,7 +135,7 @@ export default function PlayerScreen() {
 
     const listener = RemoteControlManager.addKeydownListener(handleKeyDown);
     return () => {
-      RemoteControlManager.removeKeydownListener(listener);
+      listener();
       stopAcceleratedSeek();
     };
   }, [seek, togglePausePlay, showControls, navigation, startAcceleratedSeek, stopAcceleratedSeek]);
