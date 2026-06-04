@@ -24,6 +24,7 @@ export type RootStackParamList = {
       accessToken?: string;
       userId?: string;
     };
+};
 
 export type DrawerParamList = {
   Home: undefined;
