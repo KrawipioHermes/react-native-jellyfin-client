@@ -429,4 +429,24 @@ export class VideoHandler {
   isPaused = (): boolean => {
     return this.videoRef.current?.paused ?? true;
   };
+
+  /**
+   * Set volume level
+   */
+  setVolume = (level: number) => {
+    if (this.videoRef.current) {
+      try {
+        this.videoRef.current.volume = Math.max(0, Math.min(1, level));
+      } catch (e) {
+        console.warn('[VideoHandler] Failed to set volume:', e);
+      }
+    }
+  };
+
+  /**
+   * Get current volume level
+   */
+  getVolume = (): number => {
+    return this.videoRef.current?.volume ?? 1;
+  };
 }

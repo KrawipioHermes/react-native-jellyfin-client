@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, BackHandler } from 'react-native';
-import { SpatialNavigationRoot } from 'react-tv-space-navigation';
 import { useIsFocused } from '@react-navigation/native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -13,12 +12,18 @@ import {
   KeplerVideoSurfaceView,
   KeplerCaptionsView,
 } from '@amazon-devices/react-native-w3cmedia';
+import { SpatialNavigationRoot, SpatialNavigationFocusableView } from 'react-tv-space-navigation';
 import RemoteControlManager from '@multi-tv/shared-ui/src/app/remote-control/RemoteControlManager';
 import { SupportedKeys } from '@multi-tv/shared-ui/src/app/remote-control/SupportedKeys';
 import VideoOverlay from '@multi-tv/shared-ui/src/components/player/VideoOverlay.vega';
+import FocusablePressable from '@multi-tv/shared-ui/src/components/FocusablePressable';
+import VolumePanel from '@multi-tv/shared-ui/src/components/player/VolumePanel';
 import ExitButton from '@multi-tv/shared-ui/src/components/player/ExitButton';
 import { RootStackParamList } from '../navigation/types';
 import { HlsJsPlayer } from '../store/hlsjsplayer/HlsJsPlayer';
+import { useVolume } from '@multi-tv/shared-ui/src/hooks/useVolume';
+import { scaledPixels } from '@multi-tv/shared-ui/src/hooks/useScale';
+import { colors } from '@multi-tv/shared-ui/src/theme/colors';
 import Document from '../store/hlsjsplayer/polyfills/DocumentPolyfill';
 import Element from '../store/hlsjsplayer/polyfills/ElementPolyfill';
 import TextDecoderPolyfill from '../store/hlsjsplayer/polyfills/TextDecoderPolyfill';
@@ -40,12 +45,15 @@ export default function VegaPlayerScreen() {
   const [paused, setPaused] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(false);
   const [isVideoBuffering, setIsVideoBuffering] = useState(true);
-  const [isPlayerReady, setIsPlayerReady] = useState(false);   // surface gate: true after vp.initialize()
-  const [isVideoInitialized, setIsVideoInitialized] = useState(false); // controls gate: true after loadedmetadata
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
+  const [isVideoInitialized, setIsVideoInitialized] = useState(false);
   const [isVideoEnded, setIsVideoEnded] = useState(false);
   const [isVideoError, setIsVideoError] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [volumeOpen, setVolumeOpen] = useState(false);
+
+  const [volume, muted, setVolume, toggleMute] = useVolume();
 
   const videoPlayerRef = useRef<VideoPlayer | null>(null);
   const hlsPlayerRef = useRef<HlsJsPlayer | null>(null);
@@ -63,8 +71,34 @@ export default function VegaPlayerScreen() {
   const showControls = useCallback(() => {
     setControlsVisible(true);
     if (hideControlsTimeoutRef.current) clearTimeout(hideControlsTimeoutRef.current);
-    hideControlsTimeoutRef.current = setTimeout(() => setControlsVisible(false), 5000);
+    if (!volumeOpen) {
+      hideControlsTimeoutRef.current = setTimeout(() => setControlsVisible(false), 5000);
+    }
+  }, [volumeOpen]);
+
+  const handleVolumeOpen = useCallback(() => {
+    setVolumeOpen(true);
+    if (hideControlsTimeoutRef.current) {
+      clearTimeout(hideControlsTimeoutRef.current);
+      hideControlsTimeoutRef.current = null;
+    }
   }, []);
+
+  const handleVolumeClose = useCallback(() => {
+    setVolumeOpen(false);
+    showControls();
+  }, [showControls]);
+
+  // Sync volume to HlsJsPlayer/W3C VideoPlayer when it changes
+  useEffect(() => {
+    if (videoPlayerRef.current && isVideoInitialized) {
+      try {
+        videoPlayerRef.current.volume = muted ? 0 : volume;
+      } catch (e) {
+        console.warn('[VegaPlayerScreen] Volume set error:', e);
+      }
+    }
+  }, [volume, muted, isVideoInitialized]);
 
   const seek = useCallback((time: number) => {
     if (videoPlayerRef.current && durationRef.current) {
@@ -308,6 +342,32 @@ export default function VegaPlayerScreen() {
             isBuffering={isVideoBuffering}
           />
         )}
+
+        {/* Volume panel (full-screen overlay) */}
+        <VolumePanel
+          visible={volumeOpen}
+          volume={volume}
+          muted={muted}
+          onVolumeChange={setVolume}
+          onMutedChange={toggleMute}
+          onClose={handleVolumeClose}
+        />
+
+        {/* Volume trigger button */}
+        {controlsVisible && !volumeOpen && (
+          <SpatialNavigationFocusableView>
+            {({ isFocused }) => (
+              <FocusablePressable
+                text="Volume"
+                onSelect={handleVolumeOpen}
+                style={[
+                  volumeBtnStyles.trigger,
+                  isFocused && volumeBtnStyles.triggerFocused,
+                ]}
+              />
+            )}
+          </SpatialNavigationFocusableView>
+        )}
       </View>
     </SpatialNavigationRoot>
   );
@@ -343,5 +403,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+  },
+});
+
+const volumeBtnStyles = StyleSheet.create({
+  trigger: {
+    position: 'absolute',
+    top: scaledPixels(16),
+    end: scaledPixels(16),
+    paddingHorizontal: scaledPixels(12),
+    paddingVertical: scaledPixels(8),
+    borderRadius: scaledPixels(8),
+    borderWidth: 2,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 15,
+  },
+  triggerFocused: {
+    borderColor: colors.primary,
   },
 });

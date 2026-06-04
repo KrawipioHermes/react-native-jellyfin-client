@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, BackHandler } from 'react-native';
-import { SpatialNavigationRoot } from 'react-tv-space-navigation';
+import { View, Text, StyleSheet, BackHandler } from 'react-native';
+import { SpatialNavigationRoot, SpatialNavigationFocusableView } from 'react-tv-space-navigation';
 import { useIsFocused } from '@react-navigation/native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -12,10 +12,15 @@ import { VideoPlayer as W3CVideoPlayer } from '@amazon-devices/react-native-w3cm
 import RemoteControlManager from '../app/remote-control/RemoteControlManager';
 import { SupportedKeys } from '../app/remote-control/SupportedKeys';
 import VideoOverlay from '../components/player/VideoOverlay.vega';
+import FocusablePressable from '../components/FocusablePressable';
+import VolumePanel from '../components/player/VolumePanel';
 import ExitButton from '../components/player/ExitButton';
 import VideoPlayer from '../components/player/VideoPlayer.vega';
 import { RootStackParamList } from '../navigation/types';
 import { VideoHandler } from '../utils/VideoHandler.kepler';
+import { useVolume } from '../hooks/useVolume';
+import { colors } from '../theme/colors';
+import { scaledPixels } from '../hooks/useScale';
 
 type PlayerScreenRouteProp = RouteProp<RootStackParamList, 'Player'>;
 type PlayerScreenNavigationProp = NativeStackNavigationProp<
@@ -56,6 +61,9 @@ export default function PlayerScreen() {
   const [isVideoError, setIsVideoError] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
+  const [volumeOpen, setVolumeOpen] = useState(false);
+
+  const [volume, muted, setVolume, toggleMute] = useVolume();
 
   // Refs
   const videoRef = useRef<W3CVideoPlayer | null>(null);
@@ -75,19 +83,43 @@ export default function PlayerScreen() {
     durationRef.current = duration;
   }, [duration]);
 
-  /**
-   * Show controls with auto-hide
-   */
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const showControls = useCallback(() => {
     setControlsVisible(true);
-
-    if (hideControlsTimeoutRef.current) {
-      clearTimeout(hideControlsTimeoutRef.current);
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
     }
-    hideControlsTimeoutRef.current = setTimeout(() => {
-      setControlsVisible(false);
-    }, 5000);
+    if (!volumeOpen) {
+      hideTimeoutRef.current = setTimeout(() => {
+        setControlsVisible(false);
+      }, 5000);
+    }
+  }, [volumeOpen]);
+
+  const handleVolumeOpen = useCallback(() => {
+    setVolumeOpen(true);
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
   }, []);
+
+  const handleVolumeClose = useCallback(() => {
+    setVolumeOpen(false);
+    showControls();
+  }, [showControls]);
+
+  // Sync volume to VideoHandler when it changes
+  useEffect(() => {
+    if (videoHandlerRef.current && isVideoInitialized) {
+      try {
+        videoHandlerRef.current.setVolume(muted ? 0 : volume);
+      } catch (e) {
+        console.warn('[PlayerScreen.kepler] Volume set error:', e);
+      }
+    }
+  }, [volume, muted, isVideoInitialized]);
 
   /**
    * Seek to a specific time
@@ -353,6 +385,32 @@ export default function PlayerScreen() {
             isBuffering={isVideoBuffering}
           />
         )}
+
+        {/* Volume panel (full-screen overlay) */}
+        <VolumePanel
+          visible={volumeOpen}
+          volume={volume}
+          muted={muted}
+          onVolumeChange={setVolume}
+          onMutedChange={toggleMute}
+          onClose={handleVolumeClose}
+        />
+
+        {/* Volume trigger button */}
+        {controlsVisible && !volumeOpen && (
+          <SpatialNavigationFocusableView>
+            {({ isFocused }) => (
+              <FocusablePressable
+                text="Volume"
+                onSelect={handleVolumeOpen}
+                style={[
+                  volumeButtonStyles.trigger,
+                  isFocused && volumeButtonStyles.triggerFocused,
+                ]}
+              />
+            )}
+          </SpatialNavigationFocusableView>
+        )}
       </View>
     </SpatialNavigationRoot>
   );
@@ -373,3 +431,21 @@ const usePlayerStyles = () => {
     },
   });
 };
+
+const volumeButtonStyles = StyleSheet.create({
+  trigger: {
+    position: 'absolute',
+    top: scaledPixels(16),
+    end: scaledPixels(16),
+    paddingHorizontal: scaledPixels(12),
+    paddingVertical: scaledPixels(8),
+    borderRadius: scaledPixels(8),
+    borderWidth: 2,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 15,
+  },
+  triggerFocused: {
+    borderColor: colors.primary,
+  },
+});

@@ -11,6 +11,9 @@ interface VideoPlayerProps {
   headerImage: string;
   paused: boolean;
   controls: boolean;
+  rate?: number;
+  volume?: number;
+  muted?: boolean;
   onBuffer: (isBuffering: boolean) => void;
   onProgress: (currentTime: number) => void;
   onLoad: (duration: number) => void;
@@ -25,6 +28,9 @@ const VideoPlayer = React.memo(
         headerImage,
         paused,
         controls,
+        rate = 1,
+        volume = 1,
+        muted = false,
         onBuffer,
         onProgress,
         onLoad,
@@ -45,7 +51,7 @@ const VideoPlayer = React.memo(
             : {
                 source: { uri: headerImage },
                 resizeMode: "cover" as const,
-                style: { width: "100%", height: "100%" },
+                style: { width: "100%", height: "100%" } as const,
               },
         [headerImage],
       );
@@ -66,6 +72,9 @@ const VideoPlayer = React.memo(
           style={videoStyle}
           controls={controls}
           paused={paused}
+          rate={rate}
+          volume={volume}
+          muted={muted}
           onBuffer={({ isBuffering }) => onBuffer(isBuffering)}
           onProgress={({ currentTime }) => onProgress(currentTime)}
           onLoad={({ duration }) => onLoad(duration)}
