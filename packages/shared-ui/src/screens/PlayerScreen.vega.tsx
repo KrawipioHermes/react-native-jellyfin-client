@@ -69,7 +69,6 @@ export default function PlayerScreen() {
   const videoRef = useRef<W3CVideoPlayer | null>(null);
   const surfaceHandleRef = useRef<string | null>(null);
   const captionViewHandleRef = useRef<string | null>(null);
-  const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentTimeRef = useRef<number>(0);
   const durationRef = useRef<number>(0);
   const videoHandlerRef = useRef<VideoHandler | null>(null);
