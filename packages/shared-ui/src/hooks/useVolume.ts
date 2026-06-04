@@ -2,16 +2,11 @@ import { useState, useCallback } from 'react';
 
 /** Default volume level (0-1 range) on first launch */
 const DEFAULT_VOLUME = 0.8;
-/** Storage key for persisting volume across sessions */
-const VOLUME_STORAGE_KEY = 'player_volume';
-const MUTED_STORAGE_KEY = 'player_muted';
 
 /**
  * Hook to manage volume state for the video player.
  *
  * Manages volume (0-1) and muted state independently.
- * Volume is persisted via a simple key-value approach so the same
- * level returns on next play session.
  *
  * @returns [volume, muted, setVolume, toggleMute]
  */
