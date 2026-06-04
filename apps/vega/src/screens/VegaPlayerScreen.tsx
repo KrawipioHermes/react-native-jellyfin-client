@@ -309,14 +309,27 @@ export default function VegaPlayerScreen() {
       }
     };
 
-    const listener = RemoteControlManager.addKeydownListener(handleKeyDown);
+    const handleKeyUp = (key: SupportedKeys) => {
+      if (
+        key === SupportedKeys.Right ||
+        key === SupportedKeys.Left ||
+        key === SupportedKeys.FastForward ||
+        key === SupportedKeys.Rewind
+      ) {
+        stopAcceleratedSeek();
+      }
+    };
+
+    const downListener = RemoteControlManager.addKeydownListener(handleKeyDown);
+    const upListener = RemoteControlManager.addKeyupListener(handleKeyUp);
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       navigateBack();
       return true;
     });
 
     return () => {
-      RemoteControlManager.removeKeydownListener(listener);
+      downListener();
+      upListener();
       backHandler.remove();
       stopAcceleratedSeek();
     };
