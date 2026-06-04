@@ -11,13 +11,11 @@ interface VideoPlayerProps {
   headerImage: string;
   paused: boolean;
   controls: boolean;
+  rate?: number;
   onBuffer: (isBuffering: boolean) => void;
   onProgress: (currentTime: number) => void;
   onLoad: (duration: number) => void;
   onEnd: () => void;
-  // Track selection props for react-native-video
-  selectedTextTrack?: { type: string; value: string | number };
-  selectedAudioTrack?: { type: string; value: string | number };
 }
 
 const VideoPlayer = React.memo(
@@ -28,12 +26,11 @@ const VideoPlayer = React.memo(
         headerImage,
         paused,
         controls,
+        rate = 1,
         onBuffer,
         onProgress,
         onLoad,
         onEnd,
-        selectedTextTrack,
-        selectedAudioTrack,
       },
       ref,
     ) => {
@@ -50,20 +47,9 @@ const VideoPlayer = React.memo(
             : {
                 source: { uri: headerImage },
                 resizeMode: "cover" as const,
-                style: { width: "100%", height: "100%" } as const,
+                style: { width: "100%", height: "100%" },
               },
         [headerImage],
-      );
-
-      // Memoize track selection props to prevent unnecessary re-renders
-      const textTrackConfig = useMemo(
-        () => selectedTextTrack,
-        [selectedTextTrack?.type, selectedTextTrack?.value],
-      );
-
-      const audioTrackConfig = useMemo(
-        () => selectedAudioTrack,
-        [selectedAudioTrack?.type, selectedAudioTrack?.value],
       );
 
       // Calculate video style based on current dimensions
@@ -82,14 +68,13 @@ const VideoPlayer = React.memo(
           style={videoStyle}
           controls={controls}
           paused={paused}
+          rate={rate}
           onBuffer={({ isBuffering }) => onBuffer(isBuffering)}
           onProgress={({ currentTime }) => onProgress(currentTime)}
           onLoad={({ duration }) => onLoad(duration)}
           onEnd={onEnd}
           poster={posterConfig}
           resizeMode="cover"
-          selectedTextTrack={textTrackConfig}
-          selectedAudioTrack={audioTrackConfig}
         />
       );
     },

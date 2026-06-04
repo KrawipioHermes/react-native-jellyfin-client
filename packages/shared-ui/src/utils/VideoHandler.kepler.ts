@@ -424,6 +424,19 @@ export class VideoHandler {
   };
 
   /**
+   * Set playback speed/rate
+   */
+  setPlaybackRate = (rate: number) => {
+    if (this.videoRef.current) {
+      try {
+        this.videoRef.current.playbackRate = rate;
+      } catch (e) {
+        console.warn('[VideoHandler] Failed to set playback rate:', e);
+      }
+    }
+  };
+
+  /**
    * Get current paused state
    */
   isPaused = (): boolean => {

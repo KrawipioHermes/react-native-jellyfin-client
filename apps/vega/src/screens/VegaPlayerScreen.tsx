@@ -30,6 +30,7 @@ import { useAutoHideControls } from '@multi-tv/shared-ui/src/hooks/useAutoHideCo
 import { useSeekManager } from '@multi-tv/shared-ui/src/hooks/useSeekManager';
 import { useMediaTracks } from '@multi-tv/shared-ui/src/hooks/useMediaTracks';
 import FocusablePressable from '@multi-tv/shared-ui/src/components/FocusablePressable';
+import type { PlaybackSpeed } from '@multi-tv/shared-ui/src/components/player/SettingsPanel';
 
 type PlayerScreenRouteProp = RouteProp<RootStackParamList, 'Player'>;
 type PlayerScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Player'>;
@@ -56,6 +57,8 @@ export default function VegaPlayerScreen() {
   const [duration, setDuration] = useState(0);
   const [chapters, setChapters] = useState<ChapterMarker[]>([]);
   const [trackSelectorOpen, setTrackSelectorOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
 
   const videoPlayerRef = useRef<VideoPlayer | null>(null);
   const hlsPlayerRef = useRef<HlsJsPlayer | null>(null);
@@ -66,7 +69,7 @@ export default function VegaPlayerScreen() {
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
 
-  const [controlsVisible, showControls] = useAutoHideControls(5000, trackSelectorOpen);
+  const [controlsVisible, showControls] = useAutoHideControls(5000, trackSelectorOpen || settingsOpen);
 
   // Store HLS player ref for track switching
   const hlsPlayerForTracksRef = useRef<HlsJsPlayer | null>(null);
@@ -141,6 +144,22 @@ export default function VegaPlayerScreen() {
   const handleTrackSelectorToggle = useCallback((open: boolean) => {
     setTrackSelectorOpen(open);
   }, []);
+
+  // Settings panel toggle — pauses auto-hide while panel is open
+  const handleSettingsToggle = useCallback((open: boolean) => {
+    setSettingsOpen(open);
+  }, []);
+
+  // Apply playback speed to the W3C VideoPlayer when speed changes
+  useEffect(() => {
+    if (videoPlayerRef.current && isVideoInitialized) {
+      try {
+        videoPlayerRef.current.playbackRate = playbackSpeed;
+      } catch (e) {
+        console.warn('[VegaPlayerScreen] Failed to set playback rate:', e);
+      }
+    }
+  }, [playbackSpeed, isVideoInitialized]);
 
   const seek = useCallback((time: number) => {
     if (videoPlayerRef.current && durationRef.current) {
@@ -400,6 +419,9 @@ export default function VegaPlayerScreen() {
             onSelectAudio={selectAudio}
             onSelectSubtitle={selectSubtitle}
             onTrackSelectorToggle={handleTrackSelectorToggle}
+            playbackSpeed={playbackSpeed}
+            onPlaybackSpeedChange={setPlaybackSpeed}
+            onSettingsToggle={handleSettingsToggle}
           />
         )}
       </View>
