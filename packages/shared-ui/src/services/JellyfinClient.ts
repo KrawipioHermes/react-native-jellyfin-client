@@ -1,5 +1,6 @@
 import { Jellyfin } from '@jellyfin/sdk';
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
+import type { MediaTrack } from '../../types/player';
 import { ItemFields } from '@jellyfin/sdk/lib/generated-client/models';
 import { getItemsApi } from '@jellyfin/sdk/lib/utils/api/items-api';
 import { getMediaInfoApi } from '@jellyfin/sdk/lib/utils/api/media-info-api';
@@ -154,6 +155,79 @@ const getPlaybackUrl = async (
 const getItemImageUrl = (itemId: string): string =>
   `${SERVER_URL}/Items/${itemId}/Images/Primary`;
 
+/**
+ * Extracts media tracks (audio + subtitle) from Jellyfin PlaybackInfo.
+ * Calls the /Items/{Id}/PlaybackInfo endpoint and extracts MediaStream arrays.
+ * NOTE: This makes a separate API call from getPlaybackUrl. Both hit the same
+ * endpoint. A future optimization would share the PlaybackInfo response.
+ */
+const getMediaTracks = async (
+  token: string,
+  userId: string,
+  itemId: string,
+): Promise<{ audioTracks: MediaTrack[]; subtitleTracks: MediaTrack[] }> => {
+  const api = authApi(token);
+  const response = await getMediaInfoApi(api).getPostedPlaybackInfo({
+    itemId,
+    userId,
+    playbackInfoDto: {
+      DeviceProfile: FIRE_TV_DEVICE_PROFILE as any,
+      UserId: userId,
+    },
+  });
+
+  const mediaSource = response.data.MediaSources?.[0];
+  const streams = mediaSource?.MediaStreams ?? [];
+
+  const audioTracks: MediaTrack[] = [];
+  const subtitleTracks: MediaTrack[] = [];
+
+  for (const stream of streams) {
+    const track: MediaTrack = {
+      Index: stream.Index ?? 0,
+      Type: stream.Type === 'Audio' ? 'Audio' : 'Subtitle',
+      Language: stream.Language,
+      DisplayTitle: stream.DisplayTitle,
+      Codec: stream.Codec,
+      IsDefault: stream.IsDefault,
+      IsForced: stream.IsForced,
+      IsExternal: stream.IsExternal,
+      DeliveryUrl: stream.DeliveryUrl,
+    };
+
+    if (stream.Type === 'Audio') {
+      audioTracks.push(track);
+    } else if (stream.Type === 'Subtitle') {
+      subtitleTracks.push(track);
+    }
+  }
+
+  return { audioTracks, subtitleTracks };
+};
+
+/**
+ * Fetches chapter markers from Jellyfin's PlaybackInfo.
+ * Calls /Items/{Id}/PlaybackInfo and extracts Chapter markers.
+ */
+const getChapters = async (
+  token: string,
+  userId: string,
+  itemId: string,
+): Promise<import('../../types/player').ChapterMarker[]> => {
+  const api = authApi(token);
+  const response = await getMediaInfoApi(api).getPostedPlaybackInfo({
+    itemId,
+    userId,
+    playbackInfoDto: {
+      DeviceProfile: FIRE_TV_DEVICE_PROFILE as any,
+      UserId: userId,
+    },
+  });
+
+  const mediaSource = response.data.MediaSources?.[0];
+  return (mediaSource?.Chapters as any[]) ?? [];
+};
+
 export default {
   SERVER_URL,
   initiateQuickConnect,
@@ -163,5 +237,7 @@ export default {
   getLibraryItems,
   getPlaybackUrl,
   getItemImageUrl,
+  getMediaTracks,
+  getChapters,
   COLLECTION_TYPE_TO_ITEM_KIND,
 };
