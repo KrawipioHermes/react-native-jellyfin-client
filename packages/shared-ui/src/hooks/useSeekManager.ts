@@ -48,6 +48,18 @@ export function useSeekManager(
   const seekDirectionRef = useRef<1 | -1>(1);
   const seekActiveRef = useRef<boolean>(false);
 
+  const escalate = useCallback(() => {
+    if (!seekActiveRef.current) return;
+    const nextLevel = seekLevelRef.current + 1;
+    if (nextLevel >= SEEK_ACCELERATION.length) return; // already at max
+    seekLevelRef.current = nextLevel;
+    const direction = seekDirectionRef.current;
+    const newDelta = SEEK_ACCELERATION[seekLevelRef.current] * direction;
+    const newTarget = currentTimeRef.current + newDelta;
+    seekFn(newTarget);
+    setSeekPreviewTime(newTarget);
+  }, [seekFn]);
+
   const startAcceleratedSeek = useCallback((direction: 1 | -1) => {
     seekDirectionRef.current = direction;
     seekLevelRef.current = 0;
@@ -60,24 +72,16 @@ export function useSeekManager(
     setSeekPreviewTime(target);
     setSeekPreviewDirection(direction === 1 ? 'forward' : 'backward');
 
-    // Accelerate after hold
-    if (seekHoldTimerRef.current) clearTimeout(seekHoldTimerRef.current);
-    const escalate = () => {
-      if (!seekActiveRef.current) return;
-      seekLevelRef.current = Math.min(seekLevelRef.current + 1, SEEK_ACCELERATION.length - 1);
-      const newDelta = SEEK_ACCELERATION[seekLevelRef.current] * direction;
-      const newTarget = currentTimeRef.current + newDelta;
-      seekFn(newTarget);
-      setSeekPreviewTime(newTarget);
-    };
-    seekHoldTimerRef.current = setTimeout(escalate, ACCELERATION_INTERVAL);
+    // Escalate every ACCELERATION_INTERVAL ms until max level
+    if (seekHoldTimerRef.current) clearInterval(seekHoldTimerRef.current);
+    seekHoldTimerRef.current = setInterval(escalate, ACCELERATION_INTERVAL);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seekFn]);
+  }, [seekFn, escalate]);
 
   const stopAcceleratedSeek = useCallback(() => {
     seekActiveRef.current = false;
     if (seekHoldTimerRef.current) {
-      clearTimeout(seekHoldTimerRef.current);
+      clearInterval(seekHoldTimerRef.current);
       seekHoldTimerRef.current = null;
     }
     setTimeout(() => {
