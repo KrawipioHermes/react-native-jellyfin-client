@@ -140,9 +140,11 @@ export default function PlayerScreen() {
       }
     };
 
-    const listener = RemoteControlManager.addKeydownListener(handleKeyDown);
+    const downListener = RemoteControlManager.addKeydownListener(handleKeyDown);
+    const upListener = RemoteControlManager.addKeyupListener(handleKeyUp);
     return () => {
-      RemoteControlManager.removeKeydownListener(listener);
+      downListener();
+      upListener();
       stopAcceleratedSeek();
     };
   }, [seek, togglePausePlay, showControls, navigation, startAcceleratedSeek, stopAcceleratedSeek]);
