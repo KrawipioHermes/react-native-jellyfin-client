@@ -12,6 +12,8 @@ interface VideoPlayerProps {
   paused: boolean;
   controls: boolean;
   rate?: number;
+  volume?: number;
+  muted?: boolean;
   onBuffer: (isBuffering: boolean) => void;
   onProgress: (currentTime: number) => void;
   onLoad: (duration: number) => void;
@@ -27,6 +29,8 @@ const VideoPlayer = React.memo(
         paused,
         controls,
         rate = 1,
+        volume = 1,
+        muted = false,
         onBuffer,
         onProgress,
         onLoad,
@@ -69,6 +73,8 @@ const VideoPlayer = React.memo(
           controls={controls}
           paused={paused}
           rate={rate}
+          volume={volume}
+          muted={muted}
           onBuffer={({ isBuffering }) => onBuffer(isBuffering)}
           onProgress={({ currentTime }) => onProgress(currentTime)}
           onLoad={({ duration }) => onLoad(duration)}

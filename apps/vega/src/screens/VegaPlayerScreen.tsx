@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, BackHandler } from 'react-native';
-import { SpatialNavigationRoot } from 'react-tv-space-navigation';
+import { SpatialNavigationRoot, SpatialNavigationFocusableView } from 'react-tv-space-navigation';
 import { useIsFocused } from '@react-navigation/native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,6 +16,7 @@ import {
 import RemoteControlManager from '@multi-tv/shared-ui/src/app/remote-control/RemoteControlManager';
 import { SupportedKeys } from '@multi-tv/shared-ui/src/app/remote-control/SupportedKeys';
 import VideoOverlay from '@multi-tv/shared-ui/src/components/player/VideoOverlay';
+import VolumePanel from '@multi-tv/shared-ui/src/components/player/VolumePanel';
 import { RootStackParamList } from '../navigation/types';
 import { HlsJsPlayer } from '../store/hlsjsplayer/HlsJsPlayer';
 import Document from '../store/hlsjsplayer/polyfills/DocumentPolyfill';
@@ -31,6 +32,9 @@ import { useSeekManager } from '@multi-tv/shared-ui/src/hooks/useSeekManager';
 import { useMediaTracks } from '@multi-tv/shared-ui/src/hooks/useMediaTracks';
 import FocusablePressable from '@multi-tv/shared-ui/src/components/FocusablePressable';
 import type { PlaybackSpeed } from '@multi-tv/shared-ui/src/components/player/SettingsPanel';
+import { useVolume } from '@multi-tv/shared-ui/src/hooks/useVolume';
+import { scaledPixels } from '@multi-tv/shared-ui/src/hooks/useScale';
+import { colors } from '@multi-tv/shared-ui/src/theme/colors';
 
 type PlayerScreenRouteProp = RouteProp<RootStackParamList, 'Player'>;
 type PlayerScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Player'>;
@@ -59,6 +63,7 @@ export default function VegaPlayerScreen() {
   const [trackSelectorOpen, setTrackSelectorOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
+  const [volumeOpen, setVolumeOpen] = useState(false);
 
   const videoPlayerRef = useRef<VideoPlayer | null>(null);
   const hlsPlayerRef = useRef<HlsJsPlayer | null>(null);
@@ -70,7 +75,9 @@ export default function VegaPlayerScreen() {
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
 
-  const [controlsVisible, showControls] = useAutoHideControls(5000, trackSelectorOpen || settingsOpen);
+  const [controlsVisible, showControls] = useAutoHideControls(5000, trackSelectorOpen || settingsOpen || volumeOpen);
+
+  const [volume, muted, setVolume, toggleMute] = useVolume();
 
   // Store HLS player ref for track switching
   const hlsPlayerForTracksRef = useRef<HlsJsPlayer | null>(null);
@@ -151,6 +158,15 @@ export default function VegaPlayerScreen() {
     setSettingsOpen(open);
   }, []);
 
+  const handleVolumeOpen = useCallback(() => {
+    setVolumeOpen(true);
+  }, []);
+
+  const handleVolumeClose = useCallback(() => {
+    setVolumeOpen(false);
+    showControls();
+  }, [showControls]);
+
   // Apply playback speed to the W3C VideoPlayer when speed changes
   useEffect(() => {
     if (videoPlayerRef.current && isVideoInitialized) {
@@ -161,6 +177,17 @@ export default function VegaPlayerScreen() {
       }
     }
   }, [playbackSpeed, isVideoInitialized]);
+
+  // Sync volume to W3C VideoPlayer when it changes
+  useEffect(() => {
+    if (videoPlayerRef.current && isVideoInitialized) {
+      try {
+        videoPlayerRef.current.volume = muted ? 0 : volume;
+      } catch (e) {
+        console.warn('[VegaPlayerScreen] Volume set error:', e);
+      }
+    }
+  }, [volume, muted, isVideoInitialized]);
 
   const seek = useCallback((time: number) => {
     if (videoPlayerRef.current && durationRef.current) {
@@ -442,6 +469,32 @@ export default function VegaPlayerScreen() {
             onSettingsToggle={handleSettingsToggle}
           />
         )}
+
+        {/* Volume panel (full-screen overlay) */}
+        <VolumePanel
+          visible={volumeOpen}
+          volume={volume}
+          muted={muted}
+          onVolumeChange={setVolume}
+          onMutedChange={toggleMute}
+          onClose={handleVolumeClose}
+        />
+
+        {/* Volume trigger button */}
+        {controlsVisible && !volumeOpen && (
+          <SpatialNavigationFocusableView>
+            {({ isFocused }) => (
+              <FocusablePressable
+                text="Volume"
+                onSelect={handleVolumeOpen}
+                style={[
+                  volumeBtnStyles.trigger,
+                  isFocused && volumeBtnStyles.triggerFocused,
+                ]}
+              />
+            )}
+          </SpatialNavigationFocusableView>
+        )}
       </View>
     </SpatialNavigationRoot>
   );
@@ -477,5 +530,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+  },
+});
+
+const volumeBtnStyles = StyleSheet.create({
+  trigger: {
+    position: 'absolute',
+    top: scaledPixels(16),
+    end: scaledPixels(16),
+    paddingHorizontal: scaledPixels(12),
+    paddingVertical: scaledPixels(8),
+    borderRadius: scaledPixels(8),
+    borderWidth: 2,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 15,
+  },
+  triggerFocused: {
+    borderColor: colors.primary,
   },
 });
